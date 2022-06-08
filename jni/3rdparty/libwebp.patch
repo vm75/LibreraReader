@@ -1,0 +1,15 @@
+diff --git a/Android.mk b/Android.mk
+index 4ae099c3..c3950ce8 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -273,8 +273,8 @@ endif
+ ################################################################################
+ 
+ WEBP_SRC_PATH := $(LOCAL_PATH)
+-include $(WEBP_SRC_PATH)/imageio/Android.mk
+-include $(WEBP_SRC_PATH)/examples/Android.mk
++# include $(WEBP_SRC_PATH)/imageio/Android.mk
++# include $(WEBP_SRC_PATH)/examples/Android.mk
+ 
+ ifeq ($(USE_CPUFEATURES),yes)
+   $(call import-module,android/cpufeatures)

@@ -30,7 +30,7 @@ public class LibreraApp extends MultiDexApplication {
     public static Context context;
 
     static {
-        System.loadLibrary("mypdf");
+        System.loadLibrary("Librera");
         System.loadLibrary("mobi");
         System.loadLibrary("antiword");
         MUPDF_VERSION = MuPdfDocument.getMupdfVersion();
