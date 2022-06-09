@@ -1,6 +1,6 @@
 diff --git a/Android.mk b/Android.mk
 new file mode 100644
-index 0000000..636dea9
+index 0000000..3cd83d0
 --- /dev/null
 +++ b/Android.mk
 @@ -0,0 +1,40 @@
@@ -35,8 +35,8 @@ index 0000000..636dea9
 +	tools/mobitool.c
 +
 +LOCAL_C_INCLUDES := \
-+	src \
-+	tools
++	$(LOCAL_PATH)/src \
++	$(LOCAL_PATH)/tools
 +
 +LOCAL_CFLAGS += -std=c99
 +LOCAL_CFLAGS += -DUSE_XMLWRITER

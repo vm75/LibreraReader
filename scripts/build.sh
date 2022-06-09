@@ -27,13 +27,14 @@ refreshPatches() {
     for patch in *.patch ; do
         module=${patch%.patch}
         cd ${module}
-        git add *
+        git add * .git*
         git diff --staged > ../${patch}
         cd -
     done
 }
 
 buildJni() {
+    rm -f "${APP_DIR}/src/main/jniLibs/*"
     cd "${JNI_DIR}"
     ndk-build NDK_LIBS_OUT="${APP_DIR}/src/main/jniLibs" NDK_OUT="${JNI_DIR}/obj"
 }
