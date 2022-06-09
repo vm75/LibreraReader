@@ -1,16 +1,21 @@
 [submodule "3rdparty/djvu"]
 	path = jni/3rdparty/djvu
 	url = https://git.code.sf.net/p/djvu/djvulibre-git
+	ignore = dirty
 [submodule "3rdparty/mupdf"]
 	path = jni/3rdparty/mupdf
 	url = git://git.ghostscript.com/mupdf.git
+	ignore = dirty
 [submodule "3rdparty/hqx"]
 	path = jni/3rdparty/hqx
 	url = https://github.com/grom358/hqx
+	ignore = dirty
 [submodule "jni/3rdparty/libwebp"]
 	path = jni/3rdparty/libwebp
 	url = https://github.com/webmproject/libwebp.git
 	branch = 1.2.2
+	ignore = dirty
 [submodule "jni/3rdparty/libmobi"]
 	path = jni/3rdparty/libmobi
 	url = https://github.com/bfabiszewski/libmobi.git
+	ignore = dirty
