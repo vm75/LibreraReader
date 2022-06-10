@@ -41,7 +41,11 @@ buildJni() {
 
 buildApp() {
     cd "${PROJECT_ROOT}"
-    ./gradlew assembleProRelease
+    ./gradlew assembleProDebug
+}
+
+logs() {
+    adb logcat --pid=`adb shell pidof -s com.foobnix.pro.pdf.reader`
 }
 
 main() {
