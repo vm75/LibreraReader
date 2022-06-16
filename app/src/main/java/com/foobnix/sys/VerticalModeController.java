@@ -441,8 +441,8 @@ public class VerticalModeController extends DocumentController {
             for (RectF rect : rects) {
                 quadPoints.add(new PointF(rect.left, rect.bottom));
                 quadPoints.add(new PointF(rect.right, rect.bottom));
-                quadPoints.add(new PointF(rect.right, rect.top));
-                quadPoints.add(new PointF(rect.left, rect.top));
+                quadPoints.add(new PointF(rect.right, rect.top * 15.0/16));
+                quadPoints.add(new PointF(rect.left, rect.top * 15.0/16));
             }
 
             PointF[] array = quadPoints.toArray(new PointF[quadPoints.size()]);
