@@ -1,0 +1,26 @@
+[submodule "jni/3rdparty/djvu"]
+	path = jni/3rdparty/djvu
+	url = https://git.code.sf.net/p/djvu/djvulibre-git
+	ignore = dirty
+[submodule "jni/3rdparty/hqx"]
+	path = jni/3rdparty/hqx
+	url = https://github.com/grom358/hqx.git
+	ignore = dirty
+[submodule "jni/3rdparty/libmobi"]
+	path = jni/3rdparty/libmobi
+	url = https://github.com/bfabiszewski/libmobi.git
+	ignore = dirty
+[submodule "jni/3rdparty/libwebp"]
+	path = jni/3rdparty/libwebp
+	url = https://github.com/webmproject/libwebp.git
+	branch = 1.2.2
+	ignore = dirty
+[submodule "jni/3rdparty/mupdf-1.11"]
+	path = jni/3rdparty/mupdf-1.11
+	url = https://github.com/ArtifexSoftware/mupdf.git
+	ignore = dirty
+[submodule "jni/3rdparty/mupdf-1.20"]
+	path = jni/3rdparty/mupdf-1.20
+	url = https://github.com/ArtifexSoftware/mupdf.git
+	branch = 1.20.x
+	ignore = dirty
