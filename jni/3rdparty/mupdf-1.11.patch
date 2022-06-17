@@ -1,9 +1,9 @@
 diff --git a/Android.mk b/Android.mk
 new file mode 100644
-index 000000000..c7bd11416
+index 000000000..233cdd44a
 --- /dev/null
 +++ b/Android.mk
-@@ -0,0 +1,277 @@
+@@ -0,0 +1,249 @@
 +# Android makefile to be used with ndk-build.
 +#
 +# Run ndk-build with the following arguments:
@@ -40,23 +40,22 @@ index 000000000..c7bd11416
 +include $(PREBUILT_SHARED_LIBRARY)
 +endif
 +
-+# --- Build a local static library for core mupdf ---
++# --- Build a local shared library for mupdf_java ---
 +
 +include $(CLEAR_VARS)
-+
 +LOCAL_CFLAGS    := $(APP_CFLAGS)
 +LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
 +LOCAL_ARM_MODE  := $(APP_ARM_MODE)
 +
-+LOCAL_MODULE := mupdf_core
++LOCAL_MODULE := mupdf_java
 +
 +LOCAL_STATIC_LIBRARIES := webpmux webpdemux webp
 +
++LOCAL_CPP_EXTENSION := .cc
 +
 +ifdef FZ_ENABLE_GPRF
 +LOCAL_CFLAGS += -DFZ_ENABLE_GPRF
 +endif
-+
 +
 +LOCAL_C_INCLUDES := \
 +	$(MUPDF_PATH)/include \
@@ -74,49 +73,6 @@ index 000000000..c7bd11416
 +
 +LOCAL_CFLAGS := \
 +	-ffunction-sections -fdata-sections \
-+	-DNOTO_SMALL \
-+	-DAA_BITS=8 \
-+
-+LOCAL_SRC_FILES += \
-+	$(wildcard $(MUPDF_PATH)/source/fitz/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/pdf/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/xps/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/svg/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/cbz/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/gprf/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/html/*.c) \
-+	$(wildcard $(MUPDF_PATH)/generated/*.c) \
-+
-+
-+include $(BUILD_STATIC_LIBRARY)
-+
-+# --- Build a local static library for thirdparty libraries ---
-+
-+include $(CLEAR_VARS)
-+LOCAL_CFLAGS    := $(APP_CFLAGS)
-+LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
-+LOCAL_ARM_MODE  := $(APP_ARM_MODE)
-+
-+LOCAL_MODULE := mupdf_java
-+
-+LOCAL_STATIC_LIBRARIES := webpmux webpdemux webp mupdf_core
-+
-+LOCAL_CPP_EXTENSION := .cc
-+
-+LOCAL_C_INCLUDES := \
-+	$(MUPDF_PATH)/include \
-+	$(MUPDF_PATH)/scripts/freetype \
-+	$(MUPDF_PATH)/scripts/libjpeg \
-+	$(MUPDF_PATH)/thirdparty/freetype/include \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec \
-+	$(MUPDF_PATH)/thirdparty/libjpeg \
-+	$(MUPDF_PATH)/thirdparty/mujs \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2 \
-+	$(MUPDF_PATH)/thirdparty/zlib \
-+
-+LOCAL_CFLAGS := \
-+	-ffunction-sections -fdata-sections \
 +	-DFT2_BUILD_LIBRARY -DDARWIN_NO_CARBON \
 +	'-DFT_CONFIG_MODULES_H="slimftmodules.h"' \
 +	'-DFT_CONFIG_OPTIONS_H="slimftoptions.h"' \
@@ -131,6 +87,22 @@ index 000000000..c7bd11416
 +	-Dhb_calloc_impl=hb_calloc \
 +	-Dhb_realloc_impl=hb_realloc \
 +	-Dhb_free_impl=hb_free \
++
++LOCAL_LDLIBS += $(MUPDF_EXTRA_LDLIBS)
++LOCAL_LDLIBS += -ljnigraphics
++LOCAL_LDLIBS += -llog
++LOCAL_LDLIBS += -lz
++LOCAL_LDLIBS += -lm
++
++LOCAL_SRC_FILES += \
++	$(wildcard $(MUPDF_PATH)/source/fitz/*.c) \
++	$(wildcard $(MUPDF_PATH)/source/pdf/*.c) \
++	$(wildcard $(MUPDF_PATH)/source/xps/*.c) \
++	$(wildcard $(MUPDF_PATH)/source/svg/*.c) \
++	$(wildcard $(MUPDF_PATH)/source/cbz/*.c) \
++	$(wildcard $(MUPDF_PATH)/source/gprf/*.c) \
++	$(wildcard $(MUPDF_PATH)/source/html/*.c) \
++	$(wildcard $(MUPDF_PATH)/generated/*.c) \
 +
 +LOCAL_SRC_FILES += \
 +	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftbase.c \

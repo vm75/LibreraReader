@@ -24,7 +24,7 @@ main() {
         applyPatch ${module}
     done
 
-    if [[ $1 == beta ]] ; then
+    if [[ $1 == --beta ]] ; then
         mupdf=mupdf-1.20
         beta="BETA=1"
     else

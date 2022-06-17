@@ -46,6 +46,6 @@ LOCAL_SRC_FILES := \
 	$(TOP_LOCAL_PATH)/src/libmupdf-$(MUPDF_VERSION).c
 
 LOCAL_STATIC_LIBRARIES := djvu hqx mupdf_java
-LOCAL_LDLIBS := -lm -llog -ljnigraphics
+LOCAL_LDLIBS := -lm -llog -ljnigraphics -lz
 
 include $(BUILD_SHARED_LIBRARY)
