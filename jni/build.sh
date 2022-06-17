@@ -22,11 +22,6 @@ main() {
     for module in djvu hqx libmobi libwebp ; do
         git submodule update --init --recursive ${module}
         applyPatch ${module}
-        if [[ ${module} =~ mupdf.* && ! -d ${module}/generate ]] ; then
-            make generate
-        fi
-
-        applyPatch ${patch}
     done
 
     if [[ $1 == beta ]] ; then
