@@ -31,13 +31,13 @@ main() {
         mupdf=mupdf-1.11
     fi
 
-    applyPatch ${mupdf}
     git submodule update --init --recursive ${mupdf}
     if [[ ! -d ${mupdf}/generate ]] ; then
         cd ${mupdf}
         make generate
         cd -
     fi
+    applyPatch ${mupdf}
 
     rm -f "${APP_DIR}/src/main/jniLibs/*"
     cd "${JNI_DIR}"
