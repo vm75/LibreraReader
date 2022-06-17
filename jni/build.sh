@@ -19,25 +19,28 @@ main() {
     cd "${PROJECT_ROOT}"
 
     cd "${JNI_DIR}/3rdparty"
-    for module in djvu hqx libmobi libwebp ; do
-        git submodule update --init --recursive ${module}
-        applyPatch ${module}
-    done
 
     if [[ $1 == --beta ]] ; then
         mupdf=mupdf-1.20
         beta="BETA=1"
+        shift
     else
         mupdf=mupdf-1.11
     fi
 
-    git submodule update --init --recursive ${mupdf}
-    if [[ ! -d ${mupdf}/generate ]] ; then
-        cd ${mupdf}
-        make generate
-        cd -
+    if [[ $1 == --init || ! -d ${mupdf}/generated ]] ; then
+        for module in djvu hqx libmobi libwebp ; do
+            git submodule update --init --recursive ${module}
+            applyPatch ${module}
+        done
+        git submodule update --init --recursive ${mupdf}
+        if [[ ! -d ${mupdf}/generated ]] ; then
+            cd ${mupdf}
+            make generate
+            cd -
+        fi
+        applyPatch ${mupdf}
     fi
-    applyPatch ${mupdf}
 
     rm -f "${APP_DIR}/src/main/jniLibs/*"
     cd "${JNI_DIR}"

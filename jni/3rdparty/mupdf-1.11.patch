@@ -1,9 +1,9 @@
 diff --git a/Android.mk b/Android.mk
 new file mode 100644
-index 000000000..233cdd44a
+index 000000000..7114f4a4c
 --- /dev/null
 +++ b/Android.mk
-@@ -0,0 +1,249 @@
+@@ -0,0 +1,213 @@
 +# Android makefile to be used with ndk-build.
 +#
 +# Run ndk-build with the following arguments:
@@ -16,6 +16,9 @@ index 000000000..233cdd44a
 +# The top-level Makefile will invoke ndk-build with appropriate arguments
 +# if you run 'make android'.
 +#
++# Use the MUPDF_EXTRA_CFLAGS, MUPDF_EXTRA_CPPFLAGS, MUPDF_EXTRA_LDFLAGS,
++# and MUPDF_EXTRA_LDLIBS variables to add more compiler flags.
++#
 +# LOCAL_C_INCLUDES paths are relative to the NDK root directory.
 +# LOCAL_SRC_FILES paths are relative to LOCAL_PATH.
 +#
@@ -23,70 +26,186 @@ index 000000000..233cdd44a
 +# regardless of where it is called from.
 +
 +LOCAL_PATH := $(call my-dir)
-+
 +include $(CLEAR_VARS)
 +
 +include $(LIBWEBP_ROOT)/Android.mk
 +include $(CLEAR_VARS)
 +
-+MUPDF_PATH := $(MUPDF_ROOT)
-+
-+# --- Include pre-built ghostscript library if building with gproof support ---
-+
-+ifdef FZ_ENABLE_GPRF
-+include $(CLEAR_VARS)
-+LOCAL_MODULE := gsso
-+LOCAL_SRC_FILES := libgs.so
-+include $(PREBUILT_SHARED_LIBRARY)
++ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
++HAVE_NEON := yes
 +endif
 +
-+# --- Build a local shared library for mupdf_java ---
++ifeq ($(TARGET_ARCH_ABI),x86_64)
++HAVE_AVX := yes
++HAVE_AVX2 := yes
++HAVE_FMA := yes
++HAVE_SSE4_1 := yes
++endif
++
++include $(MUPDF_ROOT)/Makelists
++include $(CLEAR_VARS)
++
++# --- Build a local static library for core mupdf ---
++
++
++LOCAL_CFLAGS    := $(APP_CFLAGS)
++LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
++LOCAL_ARM_MODE  := $(APP_ARM_MODE)
++
++LOCAL_MODULE := mupdf_core
++
++LOCAL_C_INCLUDES := $(MUPDF_ROOT)/include $(MUPDF_ROOT)/generated $(LIBWEBP_ROOT)/src
++
++LOCAL_CFLAGS := \
++	-ffunction-sections -fdata-sections \
++	-D_FILE_OFFSET_BITS=32 \
++	-DNOTO_SMALL \
++	-DAA_BITS=8 \
++	-DOPJ_STATIC -DOPJ_HAVE_INTTYPES_H -DOPJ_HAVE_STDINT_H \
++
++LOCAL_CFLAGS += -fPIC
++
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(FREETYPE_CFLAGS)))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(HARFBUZZ_CFLAGS)))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(JBIG2DEC_CFLAGS)))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(LIBJPEG_CFLAGS)))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(MUJS_CFLAGS)))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(OPENJPEG_CFLAGS)))
++
++LOCAL_CFLAGS += $(filter-out -I%,$(FREETYPE_CFLAGS))
++LOCAL_CFLAGS += $(filter-out -I%,$(HARFBUZZ_CFLAGS))
++LOCAL_CFLAGS += $(filter-out -I%,$(JBIG2DEC_CFLAGS))
++LOCAL_CFLAGS += $(filter-out -I%,$(LIBJPEG_CFLAGS))
++LOCAL_CFLAGS += $(filter-out -I%,$(MUJS_CFLAGS))
++LOCAL_CFLAGS += $(filter-out -I%,$(OPENJPEG_CFLAGS))
++
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/source/fitz/*.c)
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/source/fitz/*.cpp)
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/source/pdf/*.c)
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/source/xps/*.c)
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/source/svg/*.c)
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/source/cbz/*.c)
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/source/html/*.c)
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/source/helpers/pkcs7/*.c)
++LOCAL_SRC_FILES += $(wildcard $(MUPDF_ROOT)/generated/*.c)
++
++LOCAL_CFLAGS += $(MUPDF_EXTRA_CFLAGS)
++
++include $(BUILD_STATIC_LIBRARY)
++
++# --- Build local static libraries for thirdparty libraries ---
 +
 +include $(CLEAR_VARS)
++
++LOCAL_CFLAGS    := $(APP_CFLAGS)
++LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
++LOCAL_ARM_MODE  := $(APP_ARM_MODE)
++
++
++LOCAL_MODULE += mupdf_thirdparty_freetype
++LOCAL_SRC_FILES += $(patsubst %,$(MUPDF_ROOT)/%,$(FREETYPE_SRC))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(FREETYPE_CFLAGS) $(FREETYPE_BUILD_CFLAGS)))
++LOCAL_CFLAGS += $(filter-out -I%,$(FREETYPE_CFLAGS) $(FREETYPE_BUILD_CFLAGS))
++LOCAL_CFLAGS += $(MUPDF_EXTRA_CFLAGS)
++include $(BUILD_STATIC_LIBRARY)
++
++include $(CLEAR_VARS)
++
++LOCAL_CFLAGS    := $(APP_CFLAGS)
++LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
++LOCAL_ARM_MODE  := $(APP_ARM_MODE)
++
++
++LOCAL_MODULE += mupdf_thirdparty_jbig2dec
++LOCAL_SRC_FILES += $(patsubst %,$(MUPDF_ROOT)/%,$(JBIG2DEC_SRC))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(JBIG2DEC_CFLAGS) $(JBIG2DEC_BUILD_CFLAGS)))
++LOCAL_CFLAGS += $(filter-out -I%,$(JBIG2DEC_CFLAGS) $(JBIG2DEC_BUILD_CFLAGS))
++LOCAL_CFLAGS += $(MUPDF_EXTRA_CFLAGS)
++include $(BUILD_STATIC_LIBRARY)
++
++include $(CLEAR_VARS)
++
++LOCAL_CFLAGS    := $(APP_CFLAGS)
++LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
++LOCAL_ARM_MODE  := $(APP_ARM_MODE)
++
++
++LOCAL_MODULE += mupdf_thirdparty_harfbuzz
++LOCAL_CPP_EXTENSION := .cc
++LOCAL_SRC_FILES += $(patsubst %,$(MUPDF_ROOT)/%,$(HARFBUZZ_SRC))
++LOCAL_C_INCLUDES := $(MUPDF_ROOT)/include $(MUPDF_ROOT)/generated
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(HARFBUZZ_CFLAGS) $(HARFBUZZ_BUILD_CFLAGS)))
++LOCAL_CPPFLAGS += $(filter-out -I%,$(HARFBUZZ_CFLAGS) $(HARFBUZZ_BUILD_CFLAGS))
++LOCAL_CPPFLAGS += $(MUPDF_EXTRA_CPPFLAGS)
++include $(BUILD_STATIC_LIBRARY)
++
++include $(CLEAR_VARS)
++
++LOCAL_CFLAGS    := $(APP_CFLAGS)
++LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
++LOCAL_ARM_MODE  := $(APP_ARM_MODE)
++
++
++LOCAL_MODULE += mupdf_thirdparty_libjpeg
++LOCAL_SRC_FILES += $(patsubst %,$(MUPDF_ROOT)/%,$(LIBJPEG_SRC))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(LIBJPEG_CFLAGS) $(LIBJPEG_BUILD_CFLAGS)))
++LOCAL_CFLAGS += $(filter-out -I%,$(LIBJPEG_CFLAGS) $(LIBJPEG_BUILD_CFLAGS))
++LOCAL_CFLAGS += $(MUPDF_EXTRA_CFLAGS)
++include $(BUILD_STATIC_LIBRARY)
++
++include $(CLEAR_VARS)
++
++LOCAL_CFLAGS    := $(APP_CFLAGS)
++LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
++LOCAL_ARM_MODE  := $(APP_ARM_MODE)
++
++
++LOCAL_MODULE += mupdf_thirdparty_mujs
++LOCAL_SRC_FILES += $(patsubst %,$(MUPDF_ROOT)/%,$(MUJS_SRC))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(MUJS_CFLAGS) $(MUJS_BUILD_CFLAGS)))
++LOCAL_CFLAGS += $(filter-out -I%,$(MUJS_CFLAGS) $(MUJS_BUILD_CFLAGS))
++LOCAL_CFLAGS += $(MUPDF_EXTRA_CFLAGS)
++include $(BUILD_STATIC_LIBRARY)
++
++include $(CLEAR_VARS)
++
++LOCAL_CFLAGS    := $(APP_CFLAGS)
++LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
++LOCAL_ARM_MODE  := $(APP_ARM_MODE)
++
++
++LOCAL_MODULE += mupdf_thirdparty_openjpeg
++LOCAL_SRC_FILES += $(patsubst %,$(MUPDF_ROOT)/%,$(OPENJPEG_SRC))
++LOCAL_C_INCLUDES += $(patsubst -I%,$(MUPDF_ROOT)/%,$(filter -I%,$(OPENJPEG_CFLAGS) $(OPENJPEG_BUILD_CFLAGS)))
++LOCAL_CFLAGS += $(filter-out -I%,$(OPENJPEG_CFLAGS) $(OPENJPEG_BUILD_CFLAGS))
++LOCAL_CFLAGS += $(MUPDF_EXTRA_CFLAGS)
++include $(BUILD_STATIC_LIBRARY)
++
++# --- Build the final JNI shared library ---
++
++include $(CLEAR_VARS)
++
 +LOCAL_CFLAGS    := $(APP_CFLAGS)
 +LOCAL_CPPFLAGS  := $(APP_CPPFLAGS)
 +LOCAL_ARM_MODE  := $(APP_ARM_MODE)
 +
 +LOCAL_MODULE := mupdf_java
 +
-+LOCAL_STATIC_LIBRARIES := webpmux webpdemux webp
++LOCAL_C_INCLUDES += $(MUPDF_ROOT)/include
 +
-+LOCAL_CPP_EXTENSION := .cc
++LOCAL_CFLAGS += -DHAVE_ANDROID
++LOCAL_CFLAGS += $(MUPDF_EXTRA_CFLAGS)
 +
-+ifdef FZ_ENABLE_GPRF
-+LOCAL_CFLAGS += -DFZ_ENABLE_GPRF
-+endif
++LOCAL_SRC_FILES += $(MUPDF_ROOT)/platform/java/mupdf_native.c
 +
-+LOCAL_C_INCLUDES := \
-+	$(MUPDF_PATH)/include \
-+	$(MUPDF_PATH)/generated \
-+	$(MUPDF_PATH)/scripts/freetype \
-+	$(MUPDF_PATH)/scripts/libjpeg \
-+	$(MUPDF_PATH)/thirdparty/freetype/include \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec \
-+	$(MUPDF_PATH)/thirdparty/libjpeg \
-+	$(MUPDF_PATH)/thirdparty/mujs \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2 \
-+	$(MUPDF_PATH)/thirdparty/zlib \
-+	$(LIBWEBP_ROOT)/src \
-+
-+LOCAL_CFLAGS := \
-+	-ffunction-sections -fdata-sections \
-+	-DFT2_BUILD_LIBRARY -DDARWIN_NO_CARBON \
-+	'-DFT_CONFIG_MODULES_H="slimftmodules.h"' \
-+	'-DFT_CONFIG_OPTIONS_H="slimftoptions.h"' \
-+	-DHAVE_STDINT_H \
-+	-DOPJ_STATIC -DOPJ_HAVE_INTTYPES_H -DOPJ_HAVE_STDINT_H -DUSE_JPIP \
-+
-+LOCAL_CPPFLAGS := \
-+	-ffunction-sections -fdata-sections \
-+	-fno-rtti -fno-exceptions -fvisibility-inlines-hidden --std=c++0x \
-+	-DHAVE_OT -DHAVE_UCDN -DHB_NO_MT \
-+	-Dhb_malloc_impl=hb_malloc \
-+	-Dhb_calloc_impl=hb_calloc \
-+	-Dhb_realloc_impl=hb_realloc \
-+	-Dhb_free_impl=hb_free \
++LOCAL_STATIC_LIBRARIES += webpmux webpdemux webp
++LOCAL_STATIC_LIBRARIES += mupdf_core
++LOCAL_STATIC_LIBRARIES += mupdf_thirdparty_freetype
++LOCAL_STATIC_LIBRARIES += mupdf_thirdparty_harfbuzz
++LOCAL_STATIC_LIBRARIES += mupdf_thirdparty_jbig2dec
++LOCAL_STATIC_LIBRARIES += mupdf_thirdparty_libjpeg
++LOCAL_STATIC_LIBRARIES += mupdf_thirdparty_mujs
++LOCAL_STATIC_LIBRARIES += mupdf_thirdparty_openjpeg
 +
 +LOCAL_LDLIBS += $(MUPDF_EXTRA_LDLIBS)
 +LOCAL_LDLIBS += -ljnigraphics
@@ -94,489 +213,301 @@ index 000000000..233cdd44a
 +LOCAL_LDLIBS += -lz
 +LOCAL_LDLIBS += -lm
 +
-+LOCAL_SRC_FILES += \
-+	$(wildcard $(MUPDF_PATH)/source/fitz/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/pdf/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/xps/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/svg/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/cbz/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/gprf/*.c) \
-+	$(wildcard $(MUPDF_PATH)/source/html/*.c) \
-+	$(wildcard $(MUPDF_PATH)/generated/*.c) \
-+
-+LOCAL_SRC_FILES += \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftbase.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftbbox.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftbitmap.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftfntfmt.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftgasp.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftglyph.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftinit.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftstroke.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftsynth.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/ftsystem.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/base/fttype1.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/cff/cff.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/cid/type1cid.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/psaux/psaux.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/pshinter/pshinter.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/psnames/psnames.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/raster/raster.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/sfnt/sfnt.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/smooth/smooth.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/truetype/truetype.c \
-+	$(MUPDF_PATH)/thirdparty/freetype/src/type1/type1.c \
-+
-+LOCAL_SRC_FILES += \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-blob.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-buffer-serialize.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-buffer.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-common.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-face.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-fallback-shape.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-font.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ft.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-font.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-layout.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-map.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-arabic.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-default.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-hangul.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-hebrew.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-indic-table.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-indic.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-myanmar.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-thai.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-tibetan.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-use-table.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-complex-use.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-fallback.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape-normalize.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-shape.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ot-tag.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-set.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-shape-plan.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-shape.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-shaper.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-ucdn.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-unicode.cc \
-+	$(MUPDF_PATH)/thirdparty/harfbuzz/src/hb-warning.cc \
-+
-+LOCAL_SRC_FILES += \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_arith.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_arith_iaid.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_arith_int.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_generic.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_halftone.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_huffman.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_image.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_metadata.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_mmr.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_page.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_refinement.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_segment.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_symbol_dict.c \
-+	$(MUPDF_PATH)/thirdparty/jbig2dec/jbig2_text.c \
-+
-+LOCAL_SRC_FILES += \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jaricom.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jcomapi.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdapimin.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdapistd.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdarith.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdatadst.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdatasrc.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdcoefct.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdcolor.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jddctmgr.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdhuff.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdinput.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdmainct.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdmarker.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdmaster.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdmerge.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdpostct.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdsample.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jdtrans.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jerror.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jfdctflt.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jfdctfst.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jfdctint.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jidctflt.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jidctfst.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jidctint.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jmemmgr.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jquant1.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jquant2.c \
-+	$(MUPDF_PATH)/thirdparty/libjpeg/jutils.c \
-+
-+LOCAL_SRC_FILES += \
-+	$(MUPDF_PATH)/thirdparty/mujs/one.c \
-+
-+LOCAL_SRC_FILES += \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/bio.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/cidx_manager.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/cio.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/dwt.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/event.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/function_list.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/image.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/invert.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/j2k.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/jp2.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/mct.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/mqc.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/openjpeg.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/phix_manager.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/pi.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/ppix_manager.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/raw.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/t1.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/t2.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/tcd.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/tgt.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/thix_manager.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/thread.c \
-+	$(MUPDF_PATH)/thirdparty/openjpeg/src/lib/openjp2/tpix_manager.c \
-+
-+LOCAL_SRC_FILES += \
-+	$(MUPDF_PATH)/thirdparty/zlib/adler32.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/compress.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/crc32.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/deflate.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/inffast.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/inflate.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/inftrees.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/trees.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/uncompr.c \
-+	$(MUPDF_PATH)/thirdparty/zlib/zutil.c \
++LOCAL_LDFLAGS := -Wl,--gc-sections
++LOCAL_LDFLAGS += $(MUPDF_EXTRA_LDFLAGS)
 +
 +include $(BUILD_STATIC_LIBRARY)
-diff --git a/include/mupdf/fitz/compressed-buffer.h b/include/mupdf/fitz/compressed-buffer.h
-index a3269d1b9..477a0cd4e 100644
---- a/include/mupdf/fitz/compressed-buffer.h
-+++ b/include/mupdf/fitz/compressed-buffer.h
-@@ -37,6 +37,7 @@ enum
- 	FZ_IMAGE_PNG,
- 	FZ_IMAGE_PNM,
- 	FZ_IMAGE_TIFF,
-+	FZ_IMAGE_WEBP,
- };
- 
- struct fz_compression_params_s
-diff --git a/include/mupdf/fitz/image.h b/include/mupdf/fitz/image.h
-index a853f4eca..db6fb1c78 100644
---- a/include/mupdf/fitz/image.h
-+++ b/include/mupdf/fitz/image.h
-@@ -255,6 +255,8 @@ fz_pixmap *fz_load_jxr(fz_context *ctx, unsigned char *data, size_t size);
- fz_pixmap *fz_load_gif(fz_context *ctx, unsigned char *data, size_t size);
- fz_pixmap *fz_load_bmp(fz_context *ctx, unsigned char *data, size_t size);
- fz_pixmap *fz_load_pnm(fz_context *ctx, unsigned char *data, size_t size);
-+fz_pixmap *fz_load_webp(fz_context *ctx, unsigned char *data, size_t size);
-+fz_pixmap *fz_load_webp(fz_context *ctx, unsigned char *data, size_t size);
- 
- void fz_load_jpeg_info(fz_context *ctx, unsigned char *data, size_t size, int *w, int *h, int *xres, int *yres, fz_colorspace **cspace);
- void fz_load_jpx_info(fz_context *ctx, unsigned char *data, size_t size, int *w, int *h, int *xres, int *yres, fz_colorspace **cspace);
-@@ -264,6 +266,7 @@ void fz_load_jxr_info(fz_context *ctx, unsigned char *data, size_t size, int *w,
- void fz_load_gif_info(fz_context *ctx, unsigned char *data, size_t size, int *w, int *h, int *xres, int *yres, fz_colorspace **cspace);
- void fz_load_bmp_info(fz_context *ctx, unsigned char *data, size_t size, int *w, int *h, int *xres, int *yres, fz_colorspace **cspace);
- void fz_load_pnm_info(fz_context *ctx, unsigned char *data, size_t size, int *w, int *h, int *xres, int *yres, fz_colorspace **cspace);
-+void fz_load_webp_info(fz_context *ctx, unsigned char *data, size_t size, int *w, int *h, int *xres, int *yres, fz_colorspace **cspace);
- 
- int fz_load_tiff_subimage_count(fz_context *ctx, unsigned char *buf, size_t len);
- fz_pixmap *fz_load_tiff_subimage(fz_context *ctx, unsigned char *buf, size_t len, int subimage);
-diff --git a/include/mupdf/fitz/structured-text.h b/include/mupdf/fitz/structured-text.h
-index 6a861faa3..cf11e4869 100644
---- a/include/mupdf/fitz/structured-text.h
-+++ b/include/mupdf/fitz/structured-text.h
-@@ -249,6 +249,9 @@ void fz_analyze_text(fz_context *ctx, fz_stext_sheet *sheet, fz_stext_page *page
- */
- void fz_print_stext_sheet(fz_context *ctx, fz_output *out, fz_stext_sheet *sheet);
- 
+diff --git a/Makelists b/Makelists
+new file mode 100644
+index 000000000..f3dc7224e
+--- /dev/null
++++ b/Makelists
+@@ -0,0 +1,285 @@
++# List of source files for all thirdparty libraries.
 +
-+void send_data_base64_stext(fz_context *ctx, fz_output *out, fz_buffer *buffer);
++# --- FREETYPE2 ---
 +
- /*
- 	fz_print_stext_page_html: Output a page to a file in HTML format.
- */
-diff --git a/source/cbz/mucbz.c b/source/cbz/mucbz.c
-index a557a9c79..739fde579 100644
---- a/source/cbz/mucbz.c
-+++ b/source/cbz/mucbz.c
-@@ -6,7 +6,7 @@ typedef struct cbz_document_s cbz_document;
- typedef struct cbz_page_s cbz_page;
- 
- static const char *cbz_ext_list[] = {
--	".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".jpx", ".jp2", ".j2k", ".wdp", ".hdp", ".jxr", ".pbm", ".pgm", ".ppm", ".pam", ".pnm",
-+	".webp", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".jpx", ".jp2", ".j2k", ".wdp", ".hdp", ".jxr", ".pbm", ".pgm", ".ppm", ".pam", ".pnm",
- 	NULL
- };
- 
-@@ -72,6 +72,47 @@ cbz_compare_page_names(const void *a, const void *b)
- 	return cbz_strnatcmp(*(const char **)a, *(const char **)b);
- }
- 
-+static void
-+cbz_create_page_list_dir(fz_context *ctx, cbz_document *doc)
-+{
-+	fz_archive *arch = doc->arch;
-+	int i, k, count;
++FREETYPE_CFLAGS += -Ithirdparty/freetype/include
++FREETYPE_CFLAGS += -Iscripts/freetype
 +
-+	fz_buffer *buf;
-+	fz_xml *container_xml;
++FREETYPE_BUILD_CFLAGS += -DFT_CONFIG_MODULES_H=\"slimftmodules.h\"
++FREETYPE_BUILD_CFLAGS += -DFT_CONFIG_OPTIONS_H=\"slimftoptions.h\"
++FREETYPE_BUILD_CFLAGS += -DFT2_BUILD_LIBRARY
 +
-+	buf = fz_read_archive_entry(ctx, arch, "book.ldir");
-+	container_xml = fz_parse_xml(ctx, buf, 0);
-+	fz_drop_buffer(ctx, buf);
++FREETYPE_SRC += thirdparty/freetype/src/base/ftbase.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftbbox.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftbitmap.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftdebug.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftfntfmt.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftgasp.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftglyph.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftinit.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftstroke.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftsynth.c
++FREETYPE_SRC += thirdparty/freetype/src/base/ftsystem.c
++FREETYPE_SRC += thirdparty/freetype/src/base/fttype1.c
++FREETYPE_SRC += thirdparty/freetype/src/cff/cff.c
++FREETYPE_SRC += thirdparty/freetype/src/cid/type1cid.c
++FREETYPE_SRC += thirdparty/freetype/src/psaux/psaux.c
++FREETYPE_SRC += thirdparty/freetype/src/pshinter/pshinter.c
++FREETYPE_SRC += thirdparty/freetype/src/psnames/psnames.c
++FREETYPE_SRC += thirdparty/freetype/src/raster/raster.c
++FREETYPE_SRC += thirdparty/freetype/src/sfnt/sfnt.c
++FREETYPE_SRC += thirdparty/freetype/src/smooth/smooth.c
++FREETYPE_SRC += thirdparty/freetype/src/truetype/truetype.c
++FREETYPE_SRC += thirdparty/freetype/src/type1/type1.c
 +
-+	fz_xml *container;
-+	container = fz_xml_find(container_xml, "container");
++# --- HARFBUZZ ---
 +
-+	const char *version;
-+	version = fz_xml_att(container, "count");
++HARFBUZZ_CFLAGS += -Ithirdparty/harfbuzz/src
 +
-+	count = fz_atoi(version);
++HARFBUZZ_BUILD_CFLAGS += -Iinclude/mupdf
++HARFBUZZ_BUILD_CFLAGS += $(FREETYPE_CFLAGS)
 +
-+	fz_xml *itemref;
-+	itemref = fz_xml_find_down(container_xml, "item");
++HARFBUZZ_BUILD_CFLAGS += -DHAVE_FALLBACK=1
++HARFBUZZ_BUILD_CFLAGS += -DHAVE_FREETYPE
++HARFBUZZ_BUILD_CFLAGS += -DHAVE_OT
++HARFBUZZ_BUILD_CFLAGS += -DHAVE_ROUND
++HARFBUZZ_BUILD_CFLAGS += -DHAVE_UCDN
++HARFBUZZ_BUILD_CFLAGS += -DHB_NO_MT
++HARFBUZZ_BUILD_CFLAGS += -DHB_NO_PRAGMA_GCC_DIAGNOSTIC_ERROR
 +
-+	
-+	doc->page_count = 0;
-+	doc->page = fz_malloc_array(ctx, count, sizeof *doc->page);
-+	
-+	while (itemref)
-+	{
-+		const char *path;
-+		path = fz_xml_att(itemref, "path");
-+	
-+		doc->page[doc->page_count++] = path;
-+		
-+		itemref = fz_xml_find_next(itemref, "item");
-+		
-+	}
-+	
-+}
++HARFBUZZ_BUILD_CFLAGS += -Dhb_malloc_impl=hb_malloc
++HARFBUZZ_BUILD_CFLAGS += -Dhb_calloc_impl=hb_calloc
++HARFBUZZ_BUILD_CFLAGS += -Dhb_realloc_impl=hb_realloc
++HARFBUZZ_BUILD_CFLAGS += -Dhb_free_impl=hb_free
 +
- static void
- cbz_create_page_list(fz_context *ctx, cbz_document *doc)
- {
-@@ -159,7 +200,12 @@ cbz_load_page(fz_context *ctx, cbz_document *doc, int number)
- 	fz_var(page);
- 
- 	if (doc->arch)
--		buf = fz_read_archive_entry(ctx, doc->arch, doc->page[number]);
-+		//buf = fz_read_archive_entry(ctx, doc->arch, doc->page[number]);
-+		if (fz_has_archive_entry(ctx, doc->arch, doc->page[number]))
-+			buf = fz_read_archive_entry(ctx, doc->arch, doc->page[number]);
-+		else
-+			buf = fz_read_file(ctx, doc->page[number]);
++HARFBUZZ_BUILD_CFLAGS += -fno-exceptions
++HARFBUZZ_BUILD_CFLAGS += -fno-rtti
++HARFBUZZ_BUILD_CFLAGS += -fno-threadsafe-statics
++HARFBUZZ_BUILD_CFLAGS += -fvisibility-inlines-hidden
++HARFBUZZ_BUILD_CFLAGS += -std=gnu++11
 +
- 	if (!buf)
- 		fz_throw(ctx, FZ_ERROR_GENERIC, "cannot load cbz page");
- 
-@@ -193,7 +239,7 @@ cbz_lookup_metadata(fz_context *ctx, cbz_document *doc, const char *key, char *b
- }
- 
- static fz_document *
--cbz_open_document_with_stream(fz_context *ctx, fz_stream *file)
-+cbz_init(fz_context *ctx, fz_archive *zip, int type)
- {
- 	cbz_document *doc;
- 
-@@ -202,12 +248,17 @@ cbz_open_document_with_stream(fz_context *ctx, fz_stream *file)
- 	doc->super.drop_document = (fz_document_drop_fn *)cbz_drop_document;
- 	doc->super.count_pages = (fz_document_count_pages_fn *)cbz_count_pages;
- 	doc->super.load_page = (fz_document_load_page_fn *)cbz_load_page;
--	doc->super.lookup_metadata = (fz_document_lookup_metadata_fn *)cbz_lookup_metadata;
-+	
- 
- 	fz_try(ctx)
- 	{
--		doc->arch = fz_open_archive_with_stream(ctx, file);
--		cbz_create_page_list(ctx, doc);
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-blob.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-buffer.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-buffer-serialize.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-common.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-face.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-fallback-shape.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-font.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ft.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-font.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-layout.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-map.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-arabic.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-default.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-hangul.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-hebrew.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-indic.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-indic-table.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-myanmar.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-thai.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-tibetan.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-use.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-complex-use-table.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-fallback.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-shape-normalize.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ot-tag.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-set.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-shape.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-shape-plan.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-shaper.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-ucdn.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-unicode.cc
++HARFBUZZ_SRC += thirdparty/harfbuzz/src/hb-warning.cc
 +
-+		doc->arch = zip;
-+		if(type==1){
-+			cbz_create_page_list_dir(ctx, doc);
-+		}else{
-+			cbz_create_page_list(ctx, doc);
-+		}
- 	}
- 	fz_catch(ctx)
- 	{
-@@ -217,6 +268,28 @@ cbz_open_document_with_stream(fz_context *ctx, fz_stream *file)
- 	return &doc->super;
- }
- 
++# --- JPEG-XR (optional, used by XPS) ---
 +
-+static fz_document *
-+cbz_open_document(fz_context *ctx, const char *filename)
-+{
-+	
-+	if (strstr(filename, "book.ldir"))
-+	{
-+		printf("cbz_open_document 1");	
-+		char dirname[2048], *p;
-+		fz_strlcpy(dirname, filename, sizeof dirname);
-+		p = strstr(dirname, "book.ldir");
-+		*p = 0;
-+		printf("cbz_open_document 2");
-+		if (!dirname[0])
-+			fz_strlcpy(dirname, ".", sizeof dirname);
-+		printf("cbz_init dirname %s",dirname);	
-+		return cbz_init(ctx, fz_open_directory(ctx, dirname),1);
-+	}
++JPEGXR_CFLAGS += -Ithirdparty/jpegxr
++JPEGXR_CFLAGS += -Ithirdparty/jpegxr/Software
++JPEGXR_CFLAGS += -DHAVE_JPEGXR
 +
-+	return cbz_init(ctx, fz_open_zip_archive(ctx, filename),2);
-+}
++JPEGXR_BUILD_CFLAGS += -Wno-tautological-compare
 +
- static int
- cbz_recognize(fz_context *ctx, const char *magic)
- {
-@@ -227,6 +300,8 @@ cbz_recognize(fz_context *ctx, const char *magic)
- 	if ((ext && !fz_strcasecmp(ext, ".zip")) || !strcmp(magic, "zip") ||
- 			!strcmp(magic, "application/zip"))
- 		return 100;
-+	if (strstr(magic, "book.ldir"))
-+		return 200;
- 	if ((ext && !fz_strcasecmp(ext, ".tar")) || !strcmp(magic, "tar") ||
- 			!strcmp(magic, "application/x-tar"))
- 		return 100;
-@@ -239,6 +314,6 @@ cbz_recognize(fz_context *ctx, const char *magic)
- fz_document_handler cbz_document_handler =
- {
- 	cbz_recognize,
--	NULL,
--	cbz_open_document_with_stream
-+	cbz_open_document,
-+	NULL
- };
-diff --git a/source/fitz/image.c b/source/fitz/image.c
-index 2ee1cfbb3..3281df6fe 100644
---- a/source/fitz/image.c
-+++ b/source/fitz/image.c
-@@ -5,6 +5,11 @@
- 
- #define SCALABLE_IMAGE_DPI 600
- 
-+#include <android/log.h>
++JPEGXR_SRC += thirdparty/jpegxr/Software/algo.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/api.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/cr_parse.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/flags.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/init.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/io.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/jpegxr_pixelformat.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/r_parse.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/r_strip.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/r_tile_frequency.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/r_tile_spatial.c
++JPEGXR_SRC += thirdparty/jpegxr/Software/x_strip.c
 +
-+#define DEBUG(args...) \
-+    __android_log_print(ANDROID_LOG_DEBUG, "MuPDF", args)
++# --- LIBJPEG ---
 +
- struct fz_compressed_image_s
- {
- 	fz_image super;
-@@ -399,6 +404,8 @@ drop_pixmap_image(fz_context *ctx, fz_image *image_)
- static fz_pixmap *
- compressed_image_get_pixmap(fz_context *ctx, fz_image *image_, fz_irect *subarea, int w, int h, int *l2factor)
- {
++LIBJPEG_CFLAGS += -Ithirdparty/libjpeg
++LIBJPEG_CFLAGS += -Iscripts/libjpeg
 +
-+	DEBUG("fz_pixmap compressed_image_get_pixmap");
- 	fz_compressed_image *image = (fz_compressed_image *)image_;
- 	int native_l2factor;
- 	fz_stream *stm;
-@@ -419,6 +426,9 @@ compressed_image_get_pixmap(fz_context *ctx, fz_image *image_, fz_irect *subarea
- 	case FZ_IMAGE_BMP:
- 		tile = fz_load_bmp(ctx, image->buffer->buffer->data, image->buffer->buffer->len);
- 		break;
-+	case FZ_IMAGE_WEBP:
-+		tile = fz_load_webp(ctx, image->buffer->buffer->data, image->buffer->buffer->len);
-+		break;
- 	case FZ_IMAGE_TIFF:
- 		tile = fz_load_tiff(ctx, image->buffer->buffer->data, image->buffer->buffer->len);
- 		break;
-@@ -884,6 +894,8 @@ void fz_set_pixmap_image_tile(fz_context *ctx, fz_pixmap_image *image, fz_pixmap
- fz_image *
- fz_new_image_from_buffer(fz_context *ctx, fz_buffer *buffer)
- {
++LIBJPEG_SRC += thirdparty/libjpeg/jaricom.c
++LIBJPEG_SRC += thirdparty/libjpeg/jcomapi.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdapimin.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdapistd.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdarith.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdatadst.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdatasrc.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdcoefct.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdcolor.c
++LIBJPEG_SRC += thirdparty/libjpeg/jddctmgr.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdhuff.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdinput.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdmainct.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdmarker.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdmaster.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdmerge.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdpostct.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdsample.c
++LIBJPEG_SRC += thirdparty/libjpeg/jdtrans.c
++LIBJPEG_SRC += thirdparty/libjpeg/jerror.c
++LIBJPEG_SRC += thirdparty/libjpeg/jfdctflt.c
++LIBJPEG_SRC += thirdparty/libjpeg/jfdctfst.c
++LIBJPEG_SRC += thirdparty/libjpeg/jfdctint.c
++LIBJPEG_SRC += thirdparty/libjpeg/jidctflt.c
++LIBJPEG_SRC += thirdparty/libjpeg/jidctfst.c
++LIBJPEG_SRC += thirdparty/libjpeg/jidctint.c
++LIBJPEG_SRC += thirdparty/libjpeg/jmemmgr.c
++LIBJPEG_SRC += thirdparty/libjpeg/jquant1.c
++LIBJPEG_SRC += thirdparty/libjpeg/jquant2.c
++LIBJPEG_SRC += thirdparty/libjpeg/jutils.c
 +
 +
- 	fz_compressed_buffer *bc;
- 	int w, h, xres, yres;
- 	fz_colorspace *cspace = NULL;
-@@ -899,58 +911,79 @@ fz_new_image_from_buffer(fz_context *ctx, fz_buffer *buffer)
- 
- 	fz_try(ctx)
- 	{
++# --- MUJS ---
 +
-+		DEBUG("fz_new_image_from_buffer %c %c %c",buf[0],buf[1],buf[2]);
++MUJS_CFLAGS += -Ithirdparty/mujs
 +
- 		if (buf[0] == 'P' && buf[1] >= '1' && buf[1] <= '7')
- 		{
-+			DEBUG("fz_new_image_from_buffer FZ_IMAGE_PNM");
- 			type = FZ_IMAGE_PNM;
- 			fz_load_pnm_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (buf[0] == 0xff && buf[1] == 0x4f)
- 		{
-+			DEBUG("fz_new_image_from_buffer FZ_IMAGE_JPX");
- 			type = FZ_IMAGE_JPX;
- 			fz_load_jpx_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (buf[0] == 0x00 && buf[1] == 0x00 && buf[2] == 0x00 && buf[3] == 0x0c && buf[4] == 0x6a && buf[5] == 0x50 && buf[6] == 0x20 && buf[7] == 0x20)
- 		{
-+			DEBUG("fz_new_image_from_buffer FZ_IMAGE_JPX");
- 			type = FZ_IMAGE_JPX;
- 			fz_load_jpx_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (buf[0] == 0xff && buf[1] == 0xd8)
- 		{
-+		DEBUG("fz_new_image_from_buffer FZ_IMAGE_JPEG");
- 			type = FZ_IMAGE_JPEG;
- 			fz_load_jpeg_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (memcmp(buf, "\211PNG\r\n\032\n", 8) == 0)
- 		{
-+		DEBUG("fz_new_image_from_buffer FZ_IMAGE_PNG");
- 			type = FZ_IMAGE_PNG;
- 			fz_load_png_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (buf[0] == 'I' && buf[1] == 'I' && buf[2] == 0xBC)
- 		{
-+		DEBUG("fz_new_image_from_buffer FZ_IMAGE_JXR");
- 			type = FZ_IMAGE_JXR;
- 			fz_load_jxr_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (buf[0] == 'I' && buf[1] == 'I' && buf[2] == 42 && buf[3] == 0)
- 		{
-+		DEBUG("fz_new_image_from_buffer FZ_IMAGE_TIFF");
- 			type = FZ_IMAGE_TIFF;
- 			fz_load_tiff_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (buf[0] == 'M' && buf[1] == 'M' && buf[2] == 0 && buf[3] == 42)
- 		{
-+		DEBUG("fz_new_image_from_buffer FZ_IMAGE_TIFF");
- 			type = FZ_IMAGE_TIFF;
- 			fz_load_tiff_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (memcmp(buf, "GIF", 3) == 0)
- 		{
-+			DEBUG("fz_new_image_from_buffer FZ_IMAGE_GIF");
- 			type = FZ_IMAGE_GIF;
- 			fz_load_gif_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
- 		else if (memcmp(buf, "BM", 2) == 0)
- 		{
-+		DEBUG("fz_new_image_from_buffer FZ_IMAGE_BMP");
- 			type = FZ_IMAGE_BMP;
- 			fz_load_bmp_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
-+		}else if (memcmp(buf, "RIFF", 4) == 0)
-+		{
-+			DEBUG("fz_new_image_from_buffer WEBP");
-+			type = FZ_IMAGE_WEBP;
-+			fz_load_webp_info(ctx, buf, len, &w, &h, &xres, &yres, &cspace);
- 		}
--		else
-+		else{
-+			DEBUG("fz_new_image_from_buffer unknown");
- 			fz_throw(ctx, FZ_ERROR_GENERIC, "unknown image file format");
-+			}
++MUJS_SRC += thirdparty/mujs/one.c
 +
- 
- 		bc = fz_malloc_struct(ctx, fz_compressed_buffer);
- 		bc->buffer = fz_keep_buffer(ctx, buffer);
++# --- ZLIB ---
++
++ZLIB_CFLAGS += -Ithirdparty/zlib
++
++ZLIB_BUILD_CFLAGS += -DHAVE_UNISTD_H
++ZLIB_BUILD_CFLAGS += -DHAVE_STDARG_H
++
++ZLIB_SRC += thirdparty/zlib/adler32.c
++ZLIB_SRC += thirdparty/zlib/compress.c
++ZLIB_SRC += thirdparty/zlib/crc32.c
++ZLIB_SRC += thirdparty/zlib/deflate.c
++ZLIB_SRC += thirdparty/zlib/inffast.c
++ZLIB_SRC += thirdparty/zlib/inflate.c
++ZLIB_SRC += thirdparty/zlib/inftrees.c
++ZLIB_SRC += thirdparty/zlib/trees.c
++ZLIB_SRC += thirdparty/zlib/uncompr.c
++ZLIB_SRC += thirdparty/zlib/zutil.c
++
++# --- JBIG2DEC ---
++
++JBIG2DEC_CFLAGS += -Ithirdparty/jbig2dec
++
++JBIG2DEC_BUILD_CFLAGS += -Iinclude
++JBIG2DEC_BUILD_CFLAGS += -DHAVE_STDINT_H
++JBIG2DEC_BUILD_CFLAGS += -DJBIG_EXTERNAL_MEMENTO_H=\"mupdf/memento.h\"
++
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_arith.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_arith_iaid.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_arith_int.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_generic.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_halftone.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_huffman.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_image.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_metadata.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_mmr.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_page.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_refinement.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_segment.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_symbol_dict.c
++JBIG2DEC_SRC += thirdparty/jbig2dec/jbig2_text.c
++
++# --- OPENJPEG ---
++
++OPENJPEG_CFLAGS += -Ithirdparty/openjpeg/src/lib/openjp2
++OPENJPEG_CFLAGS += -DOPJ_STATIC
++OPENJPEG_CFLAGS += -DOPJ_HAVE_INTTYPES_H
++OPENJPEG_CFLAGS += -DOPJ_HAVE_STDINT_H
++
++OPENJPEG_BUILD_CFLAGS += -Ithirdparty/openjpeg/src/lib/openjp2
++OPENJPEG_BUILD_CFLAGS += -DMUTEX_pthread=0
++
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/bio.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/cio.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/dwt.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/event.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/function_list.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/image.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/invert.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/j2k.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/jp2.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/mct.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/mqc.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/openjpeg.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/pi.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/raw.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/t1.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/t2.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/tcd.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/tgt.c
++OPENJPEG_SRC += thirdparty/openjpeg/src/lib/openjp2/thread.c
++
++# --- FREEGLUT ---
++
++GLUT_CFLAGS += -Ithirdparty/freeglut/include
++
++GLUT_BUILD_CFLAGS += -Ithirdparty/freeglut/src
++GLUT_BUILD_CFLAGS += -DHAVE_UNISTD_H
++GLUT_BUILD_CFLAGS += -DHAVE_STDINT_H
++GLUT_BUILD_CFLAGS += -DHAVE_X11_EXTENSIONS_XRANDR_H
++
++GLUT_SRC += thirdparty/freeglut/src/fg_callbacks.c
++GLUT_SRC += thirdparty/freeglut/src/fg_cursor.c
++GLUT_SRC += thirdparty/freeglut/src/fg_display.c
++GLUT_SRC += thirdparty/freeglut/src/fg_ext.c
++GLUT_SRC += thirdparty/freeglut/src/fg_font.c
++GLUT_SRC += thirdparty/freeglut/src/fg_font_data.c
++GLUT_SRC += thirdparty/freeglut/src/fg_gamemode.c
++GLUT_SRC += thirdparty/freeglut/src/fg_geometry.c
++GLUT_SRC += thirdparty/freeglut/src/fg_gl2.c
++GLUT_SRC += thirdparty/freeglut/src/fg_init.c
++GLUT_SRC += thirdparty/freeglut/src/fg_input_devices.c
++GLUT_SRC += thirdparty/freeglut/src/fg_joystick.c
++GLUT_SRC += thirdparty/freeglut/src/fg_main.c
++GLUT_SRC += thirdparty/freeglut/src/fg_menu.c
++GLUT_SRC += thirdparty/freeglut/src/fg_misc.c
++GLUT_SRC += thirdparty/freeglut/src/fg_overlay.c
++GLUT_SRC += thirdparty/freeglut/src/fg_spaceball.c
++GLUT_SRC += thirdparty/freeglut/src/fg_state.c
++GLUT_SRC += thirdparty/freeglut/src/fg_stroke_mono_roman.c
++GLUT_SRC += thirdparty/freeglut/src/fg_stroke_roman.c
++GLUT_SRC += thirdparty/freeglut/src/fg_structure.c
++GLUT_SRC += thirdparty/freeglut/src/fg_teapot.c
++GLUT_SRC += thirdparty/freeglut/src/fg_videoresize.c
++GLUT_SRC += thirdparty/freeglut/src/fg_window.c
++
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_cursor_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_display_x11_glx.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_ext_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_gamemode_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_glutfont_definitions_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_init_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_input_devices_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_joystick_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_main_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_menu_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_spaceball_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_state_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_state_x11_glx.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_structure_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_window_x11.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_window_x11_glx.c
++GLUT_SRC += thirdparty/freeglut/src/x11/fg_xinput_x11.c
++
++GLUT_LIBS += -lGL
++GLUT_LIBS += -lX11
++GLUT_LIBS += -lXrandr
 diff --git a/source/fitz/load-webp.c b/source/fitz/load-webp.c
 new file mode 100644
 index 000000000..710d8274e
@@ -641,831 +572,3 @@ index 000000000..710d8274e
 +    *xresp = 72;
 +    *yresp = 72;
 +}
-diff --git a/source/fitz/stext-output.c b/source/fitz/stext-output.c
-index 49ef2ea5f..19d8664f5 100644
---- a/source/fitz/stext-output.c
-+++ b/source/fitz/stext-output.c
-@@ -53,7 +53,7 @@ fz_print_stext_sheet(fz_context *ctx, fz_output *out, fz_stext_sheet *sheet)
- 		fz_print_style(ctx, out, style);
- }
- 
--static void
-+void
- send_data_base64_stext(fz_context *ctx, fz_output *out, fz_buffer *buffer)
- {
- 	size_t i, len;
-diff --git a/source/fitz/xml.c b/source/fitz/xml.c
-index a81ab66d5..1cda2d452 100644
---- a/source/fitz/xml.c
-+++ b/source/fitz/xml.c
-@@ -455,6 +455,10 @@ parse_text:
- 	mark = p;
- 	while (*p && *p != '<') ++p;
- 	if (*p == '<') {
-+		if(p[1]=='b' && p[2]=='r' && p[3]=='>' && p[4]=='<' && p[5]=='b' && p[6]=='r' && p[7]=='>'){
-+			p+=8;
-+			goto parse_text;
-+		}
- 		/* skip trailing newline before closing tag */
- 		if (p[1] == '/' && p - 1 >= mark && p[-1] == '\n')
- 			xml_emit_text(ctx, parser, mark, p - 1);
-@@ -585,9 +589,9 @@ parse_attribute_value:
- 	return "end of data in attribute value";
- }
- 
--static char *convert_to_utf8(fz_context *doc, unsigned char *s, size_t n, int *dofree)
-+static char *convert_to_utf8(fz_context *doc, const unsigned char *s, size_t n, int *dofree)
- {
--	unsigned char *e = s + n;
-+	const unsigned char *e = s + n;
- 	char *dst, *d;
- 	int c;
- 
-diff --git a/source/html/css-apply.c b/source/html/css-apply.c
-index f3e28ddda..dc0fbbea2 100644
---- a/source/html/css-apply.c
-+++ b/source/html/css-apply.c
-@@ -877,7 +877,7 @@ fz_css_strtof(char *s, char **endptr)
- }
- 
- static fz_css_number
--number_from_value(fz_css_value *value, float initial, int initial_unit)
-+number_from_value_in(fz_css_value *value, float initial, int initial_unit, int isFont)
- {
- 	char *p;
- 
-@@ -885,7 +885,7 @@ number_from_value(fz_css_value *value, float initial, int initial_unit)
- 		return make_number(initial, initial_unit);
- 
- 	if (value->type == CSS_PERCENT)
--		return make_number(fz_css_strtof(value->data, NULL), N_PERCENT);
-+		return make_number(fz_css_strtof(value->data, NULL)/2.5, N_PERCENT);
- 
- 	if (value->type == CSS_NUMBER)
- 		return make_number(fz_css_strtof(value->data, NULL), N_NUMBER);
-@@ -895,7 +895,8 @@ number_from_value(fz_css_value *value, float initial, int initial_unit)
- 		float x = fz_css_strtof(value->data, &p);
- 
- 		if (p[0] == 'e' && p[1] == 'm' && p[2] == 0)
--			return make_number(x, N_SCALE);
-+			return isFont? make_number(x < 0.5 ? 0.5: x, N_SCALE) : make_number(x, N_SCALE);
-+
- 		if (p[0] == 'e' && p[1] == 'x' && p[2] == 0)
- 			return make_number(x / 2, N_SCALE);
- 
-@@ -909,30 +910,40 @@ number_from_value(fz_css_value *value, float initial, int initial_unit)
- 			return make_number(x * 12, N_LENGTH);
- 
- 		if (p[0] == 'p' && p[1] == 't' && p[2] == 0)
--			return make_number(x, N_LENGTH);
-+            return isFont? make_number(x / 12 < 1 ? 1 : x / 12, N_SCALE) :make_number(x, N_LENGTH);
-+
- 		if (p[0] == 'p' && p[1] == 'x' && p[2] == 0)
--			return make_number(x, N_LENGTH);
-+			return isFont? make_number(x / 25 < 1 ? 1 : x / 25, N_SCALE): make_number(x, N_LENGTH);
- 
--		/* FIXME: 'rem' should be 'em' of root element. This is a bad approximation. */
- 		if (p[0] == 'r' && p[1] == 'e' && p[2] == 'm' && p[3] == 0)
--			return make_number(x * 16, N_LENGTH);
-+			return isFont? make_number(x <1 ? 1: x, N_SCALE) : make_number(x, N_SCALE);
-+
- 
--		/* FIXME: 'ch' should be width of '0' character. This is an approximation. */
- 		if (p[0] == 'c' && p[1] == 'h' && p[2] == 0)
- 			return make_number(x / 2, N_LENGTH);
- 
--		return make_number(x, N_LENGTH);
-+		return make_number(x, N_SCALE);
- 	}
- 
- 	if (value->type == CSS_KEYWORD)
- 	{
- 		if (!strcmp(value->data, "auto"))
--			return make_number(0, N_AUTO);
-+			return make_number(0, N_LENGTH);
- 	}
- 
- 	return make_number(initial, initial_unit);
- }
- 
-+static fz_css_number
-+number_from_value(fz_css_value *value, float initial, int initial_unit){
-+    return number_from_value_in(value, initial, initial_unit, 0);
-+}
-+static fz_css_number
-+number_from_value_font(fz_css_value *value, float initial, int initial_unit){
-+    return number_from_value_in(value, initial, initial_unit, 1);
-+}
-+
-+
- static fz_css_number
- number_from_property(fz_css_match *match, const char *property, float initial, int initial_unit)
- {
-@@ -1021,7 +1032,7 @@ color_from_value(fz_css_value *value, fz_css_color initial)
- 
- 	if (value->type == CSS_HASH)
- 	{
--		int r, g, b;
-+		int r, g, b, a;
- 		size_t n;
- hex_color:
- 		n = strlen(value->data);
-@@ -1030,18 +1041,35 @@ hex_color:
- 			r = tohex(value->data[0]) * 16 + tohex(value->data[0]);
- 			g = tohex(value->data[1]) * 16 + tohex(value->data[1]);
- 			b = tohex(value->data[2]) * 16 + tohex(value->data[2]);
-+			a = 255;
-+		}
-+		else if (n == 4)
-+		{
-+			r = tohex(value->data[0]) * 16 + tohex(value->data[0]);
-+			g = tohex(value->data[1]) * 16 + tohex(value->data[1]);
-+			b = tohex(value->data[2]) * 16 + tohex(value->data[2]);
-+			a = tohex(value->data[3]) * 16 + tohex(value->data[3]);
- 		}
- 		else if (n == 6)
- 		{
- 			r = tohex(value->data[0]) * 16 + tohex(value->data[1]);
- 			g = tohex(value->data[2]) * 16 + tohex(value->data[3]);
- 			b = tohex(value->data[4]) * 16 + tohex(value->data[5]);
-+			a = 255;
-+		}
-+		else if (n == 8)
-+		{
-+			r = tohex(value->data[0]) * 16 + tohex(value->data[1]);
-+			g = tohex(value->data[2]) * 16 + tohex(value->data[3]);
-+			b = tohex(value->data[4]) * 16 + tohex(value->data[5]);
-+			a = tohex(value->data[6]) * 16 + tohex(value->data[7]);
- 		}
- 		else
- 		{
- 			r = g = b = 0;
-+			a = 255;
- 		}
--		return make_color(r, g, b, 255);
-+		return make_color(r, g, b, a);
- 	}
- 
- 	if (value->type == '(' && !strcmp(value->data, "rgb"))
-@@ -1057,6 +1085,21 @@ hex_color:
- 		return make_color(r, g, b, 255);
- 	}
- 
-+	if (value->type == '(' && !strcmp(value->data, "rgba"))
-+	{
-+		fz_css_value *vr, *vg, *vb, *va;
-+		int r, g, b, a;
-+		vr = value->args;
-+		vg = vr && vr->next ? vr->next->next : NULL; /* skip the ',' nodes */
-+		vb = vg && vg->next ? vg->next->next : NULL; /* skip the ',' nodes */
-+		va = vb && vb->next ? vb->next->next : NULL; /* skip the ',' nodes */
-+		r = fz_from_css_number(number_from_value(vr, 0, N_NUMBER), 255, 255);
-+		g = fz_from_css_number(number_from_value(vg, 0, N_NUMBER), 255, 255);
-+		b = fz_from_css_number(number_from_value(vb, 0, N_NUMBER), 255, 255);
-+		a = fz_from_css_number(number_from_value(va, 0, N_NUMBER), 255, 255);
-+		return make_color(r, g, b, a);
-+	}
-+
- 	if (value->type == CSS_KEYWORD)
- 	{
- 		if (!strcmp(value->data, "transparent"))
-@@ -1121,7 +1164,7 @@ fz_get_css_match_display(fz_css_match *match)
- 		if (!strcmp(value->data, "list-item"))
- 			return DIS_LIST_ITEM;
- 		if (!strcmp(value->data, "inline-block"))
--			return DIS_INLINE_BLOCK;
-+			return DIS_INLINE;//DIS_INLINE_BLOCK;
- 	}
- 	return DIS_INLINE;
- }
-@@ -1228,10 +1271,21 @@ fz_apply_css_style(fz_context *ctx, fz_html_font_set *set, fz_css_style *style,
- 		else if (!strcmp(value->data, "medium")) style->font_size = make_number(1.0f, N_SCALE);
- 		else if (!strcmp(value->data, "small")) style->font_size = make_number(0.83f, N_SCALE);
- 		else if (!strcmp(value->data, "x-small")) style->font_size = make_number(0.69f, N_SCALE);
--		else if (!strcmp(value->data, "xx-small")) style->font_size = make_number(0.69f, N_SCALE);
-+		else if (!strcmp(value->data, "xx-small")) style->font_size = make_number(0.49f, N_SCALE);
-+
- 		else if (!strcmp(value->data, "larger")) style->font_size = make_number(1.2f, N_SCALE);
- 		else if (!strcmp(value->data, "smaller")) style->font_size = make_number(1/1.2f, N_SCALE);
--		else style->font_size = number_from_value(value, 12, N_LENGTH);
-+		else if (!strcmp(value->data, "inherit")) style->font_size = make_number(1.0f, N_SCALE);
-+		//else style->font_size =make_number(1.0f, N_SCALE);
-+		else
-+		{
-+			if (value->type == CSS_PERCENT){
-+				style->font_size = make_number(fz_css_strtof(value->data, NULL)/100, N_SCALE);
-+			}else{
-+				style->font_size = number_from_value_font(value, 1, N_SCALE);
-+			}
-+		}
-+
- 	}
- 	else
- 	{
-@@ -1259,23 +1313,47 @@ fz_apply_css_style(fz_context *ctx, fz_html_font_set *set, fz_css_style *style,
- 		else if (!strcmp(value->data, "georgian")) style->list_style_type = LST_GEORGIAN;
- 	}
- 
--	style->line_height = number_from_property(match, "line-height", 1.2f, N_SCALE);
--
--	style->text_indent = number_from_property(match, "text-indent", 0, N_LENGTH);
- 
--	style->width = number_from_property(match, "width", 0, N_AUTO);
--	style->height = number_from_property(match, "height", 0, N_AUTO);
-+	//style->width = number_from_property(match, "width", 0, N_AUTO);
-+	//style->height = number_from_property(match, "height", 0, N_AUTO);
- 
- 	style->margin[0] = number_from_property(match, "margin-top", 0, N_LENGTH);
- 	style->margin[1] = number_from_property(match, "margin-right", 0, N_LENGTH);
- 	style->margin[2] = number_from_property(match, "margin-bottom", 0, N_LENGTH);
- 	style->margin[3] = number_from_property(match, "margin-left", 0, N_LENGTH);
- 
-+	if(style->margin[0].unit==N_SCALE && style->margin[0].value>2)style->margin[0].value=2;
-+	if(style->margin[1].unit==N_SCALE && style->margin[1].value>2)style->margin[1].value=2;
-+	if(style->margin[2].unit==N_SCALE && style->margin[2].value>2)style->margin[2].value=2;
-+	if(style->margin[3].unit==N_SCALE && style->margin[3].value>2)style->margin[3].value=2;
-+
-+
-+	if(style->margin[0].unit==N_SCALE && style->margin[0].value<-2)style->margin[0].value=-2;
-+	if(style->margin[1].unit==N_SCALE && style->margin[1].value<-2)style->margin[1].value=-2;
-+	if(style->margin[2].unit==N_SCALE && style->margin[2].value<-2)style->margin[2].value=-2;
-+	if(style->margin[3].unit==N_SCALE && style->margin[3].value<-2)style->margin[3].value=-2;
-+
- 	style->padding[0] = number_from_property(match, "padding-top", 0, N_LENGTH);
- 	style->padding[1] = number_from_property(match, "padding-right", 0, N_LENGTH);
- 	style->padding[2] = number_from_property(match, "padding-bottom", 0, N_LENGTH);
- 	style->padding[3] = number_from_property(match, "padding-left", 0, N_LENGTH);
- 
-+    style->padding[1].value = style->padding[1].value / 2;
-+    style->padding[3].value = style->padding[3].value / 2;
-+
-+
-+	style->line_height = number_from_property(match, "line-height", 1.2f, N_SCALE);
-+	if (style->line_height.value < 0) style->line_height.value = 1.2f;
-+
-+	style->text_indent = number_from_property(match, "text-indent", 0, N_LENGTH);
-+	//fix to long negative text-indent
-+	if (style->text_indent.value < 0){
-+		if(style->text_indent.value * -1 > style->margin[3].value)
-+		{
-+			style->text_indent.value = -1 * style->margin[3].value;
-+		}
-+	}
-+
- 	style->color = color_from_property(match, "color", black);
- 	style->background_color = color_from_property(match, "background-color", transparent);
- 
-diff --git a/source/html/epub-doc.c b/source/html/epub-doc.c
-index 44903d994..8949b7730 100644
---- a/source/html/epub-doc.c
-+++ b/source/html/epub-doc.c
-@@ -71,7 +71,7 @@ epub_update_outline(fz_context *ctx, fz_document *doc, fz_outline *node)
- {
- 	while (node)
- 	{
--		node->page = epub_resolve_link(ctx, doc, node->uri, NULL, NULL);
-+		node->page = -1; // epub_resolve_link(ctx, doc, node->uri, NULL, NULL);
- 		epub_update_outline(ctx, doc, node->down);
- 		node = node->next;
- 	}
-@@ -258,6 +258,12 @@ rel_path_from_idref(fz_xml *manifest, const char *idref)
- 		const char *id = fz_xml_att(item, "id");
- 		if (id && !strcmp(id, idref))
- 			return fz_xml_att(item, "href");
-+
-+		const char *id2 = fz_xml_att(item, "properties");
-+				if (id2 && !strcmp(id2, idref))
-+					return fz_xml_att(item, "href");
-+
-+
- 		item = fz_xml_find_next(item, "item");
- 	}
- 	return NULL;
-@@ -349,11 +355,88 @@ epub_parse_ncx(fz_context *ctx, epub_document *doc, const char *path)
- 	ncx = fz_parse_xml(ctx, buf, 0);
- 	fz_drop_buffer(ctx, buf);
- 
-+
- 	doc->outline = epub_parse_ncx_imp(ctx, doc, fz_xml_find_down(ncx, "navMap"), base_uri);
- 
- 	fz_drop_xml(ctx, ncx);
- }
- 
-+static fz_outline *
-+epub_parse_nav_imp(fz_context *ctx, epub_document *doc, fz_xml *node, char *base_uri)
-+{
-+	char path[2048];
-+	fz_outline *outline, *head, **tailp;
-+
-+	head = NULL;
-+	tailp = &head;
-+
-+
-+	node =  fz_xml_find_down(fz_xml_find_down(node, "ol"),"li");
-+
-+
-+	while (node)
-+	{
-+		fz_xml *tag = fz_xml_find_down(node, "a");
-+		char *text = fz_xml_text(fz_xml_down(tag));
-+		if(!text){
-+			text = fz_xml_text(fz_xml_down(fz_xml_down(tag)));
-+		}
-+		char *content = fz_xml_att(tag, "href");
-+		if (text && content)
-+		{
-+			fz_strlcpy(path, base_uri, sizeof path);
-+			fz_strlcat(path, "/", sizeof path);
-+			fz_strlcat(path, content, sizeof path);
-+			fz_urldecode(path);
-+			fz_cleanname(path);
-+
-+			*tailp = outline = fz_new_outline(ctx);
-+			tailp = &(*tailp)->next;
-+			outline->title = fz_strdup(ctx, text);
-+			outline->uri = fz_strdup(ctx, path);
-+			outline->page = -1;
-+			outline->down = epub_parse_nav_imp(ctx, doc, node, base_uri);
-+		}
-+		node = fz_xml_find_next(node, "li");
-+	}
-+
-+	return head;
-+}
-+
-+static void
-+epub_parse_nav(fz_context *ctx, epub_document *doc, const char *path)
-+{
-+	fz_archive *zip = doc->zip;
-+	fz_buffer *buf;
-+	fz_xml *ncx;
-+	char base_uri[2048];
-+
-+	fz_dirname(base_uri, path, sizeof base_uri);
-+
-+
-+	buf = fz_read_archive_entry(ctx, zip, path);
-+	ncx = fz_parse_xml(ctx, buf, 0);
-+	fz_drop_buffer(ctx, buf);
-+
-+	fz_xml *body = fz_xml_find_down(ncx, "body");
-+	fz_xml *section = fz_xml_find_down(body, "section");
-+	if(section){
-+		body = section;
-+	}
-+	fz_xml * nav = fz_xml_find_down(body, "nav");
-+
-+	while (nav){
-+		char *id = fz_xml_att(nav, "epub:type");
-+		if(!strcmp(id, "toc")){
-+			doc->outline = epub_parse_nav_imp(ctx, doc, nav, base_uri);
-+			break;
-+		}
-+		nav = fz_xml_find_next(body,"nav");
-+	}
-+	fz_drop_xml(ctx, ncx);
-+}
-+
-+
- static char *
- find_metadata(fz_context *ctx, fz_xml *metadata, char *key)
- {
-@@ -377,10 +460,10 @@ epub_parse_header(fz_context *ctx, epub_document *doc)
- 	char ncx[2048], s[2048];
- 	epub_chapter **tailp;
- 
--	if (fz_has_archive_entry(ctx, zip, "META-INF/rights.xml"))
--		fz_throw(ctx, FZ_ERROR_GENERIC, "EPUB is locked by DRM");
--	if (fz_has_archive_entry(ctx, zip, "META-INF/encryption.xml"))
--		fz_throw(ctx, FZ_ERROR_GENERIC, "EPUB is locked by DRM");
-+	//if (fz_has_archive_entry(ctx, zip, "META-INF/rights.xml"))
-+		//fz_throw(ctx, FZ_ERROR_GENERIC, "EPUB is locked by DRM");
-+	//if (fz_has_archive_entry(ctx, zip, "META-INF/encryption.xml"))
-+		//fz_throw(ctx, FZ_ERROR_GENERIC, "EPUB is locked by DRM");
- 
- 	/* parse META-INF/container.xml to find OPF */
- 
-@@ -421,6 +504,9 @@ epub_parse_header(fz_context *ctx, epub_document *doc)
- 	if (path_from_idref(ncx, manifest, base_uri, fz_xml_att(spine, "toc"), sizeof ncx))
- 	{
- 		epub_parse_ncx(ctx, doc, ncx);
-+	}else if (path_from_idref(ncx, manifest, base_uri, "nav", sizeof ncx))
-+	{
-+		epub_parse_nav(ctx, doc, ncx);
- 	}
- 
- 	doc->spine = NULL;
-@@ -430,8 +516,15 @@ epub_parse_header(fz_context *ctx, epub_document *doc)
- 	{
- 		if (path_from_idref(s, manifest, base_uri, fz_xml_att(itemref, "idref"), sizeof s))
- 		{
--			*tailp = epub_parse_chapter(ctx, doc, s);
--			tailp = &(*tailp)->next;
-+			fz_try(ctx)
-+			{
-+				*tailp = epub_parse_chapter(ctx, doc, s);
-+				tailp = &(*tailp)->next;
-+			}
-+			fz_catch(ctx)
-+			{
-+				fz_warn(ctx, "ignoring chapter %s", s);
-+			}
- 		}
- 		itemref = fz_xml_find_next(itemref, "itemref");
- 	}
-diff --git a/source/html/html-layout.c b/source/html/html-layout.c
-index 8520c7829..65d3f2524 100644
---- a/source/html/html-layout.c
-+++ b/source/html/html-layout.c
-@@ -18,7 +18,7 @@ static const char *html_default_css =
- "b{font-weight:bold}"
- "bdo{direction:rtl;unicode-bidi:bidi-override}"
- "blockquote{display:block;margin:1em 40px}"
--"body{display:block;margin:1em}"
-+"body{display:inline !important;margin:1em}"
- "cite{font-style:italic}"
- "code{font-family:monospace}"
- "dd{display:block;margin:0 0 0 40px}"
-@@ -40,34 +40,39 @@ static const char *html_default_css =
- "ins{text-decoration:underline}"
- "kbd{font-family:monospace}"
- "li{display:list-item}"
--"menu{display:block;list-style-type:disc;margin:1em 0;padding:0 0 0 30pt}"
--"ol{display:block;list-style-type:decimal;margin:1em 0;padding:0 0 0 30pt}"
--"p{display:block;margin:1em 0}"
-+"menu{display:block;list-style-type:disc;margin:1em 0;padding:0 1em 0 1em}"
-+"ol{display:block;list-style-type:decimal;margin:1em;padding:0 1em 0 1em}"
-+"p{display:block;}"
- "pre{display:block;font-family:monospace;margin:1em 0;white-space:pre}"
- "samp{font-family:monospace}"
- "script{display:none}"
- "small{font-size:0.83em}"
-+"x-small{font-size:0.6em}"
- "strong{font-weight:bold}"
- "style{display:none}"
- "sub{font-size:0.83em;vertical-align:sub}"
- "sup{font-size:0.83em;vertical-align:super}"
--"table{display:table}"
--"tbody{display:table-row-group}"
--"td{display:table-cell;padding:1px}"
--"tfoot{display:table-footer-group}"
--"th{display:table-cell;font-weight:bold;padding:1px;text-align:center}"
--"thead{display:table-header-group}"
--"tr{display:table-row}"
--"ul{display:block;list-style-type:disc;margin:1em 0;padding:0 0 0 30pt}"
-+
-+"table{display:block !important; margin:1em !important;font-size:0.8em;}"
-+"tr,thead,tfoot   {display:block !important;margin-top:0.5em !important;}"
-+"td,th {display:block !important;border-style:solid; border-width:1px; padding:0.1em 0 0.1em 0.5em}"
-+"tbody {display:block !important;}"
-+"th{font-weight:bold; text-align:center}"
-+
-+"figcaption {display:block; text-align:center}"
-+"figcaption>p {text-align:center}"
-+
-+"ul{display:block;list-style-type:disc;margin:1em;padding:0 1em 0 1em}"
- "ul ul{list-style-type:circle}"
- "ul ul ul{list-style-type:square}"
- "var{font-style:italic}"
- "svg{display:none}"
-+"br{display:block}"
- ;
- 
- static const char *fb2_default_css =
--"@page{margin:2em 2em}"
--"FictionBook{display:block;margin:0;line-height:1.2em}"
-+"@page{margin:2em 1em}"
-+"FictionBook{display:block}"
- "stylesheet,binary{display:none}"
- #ifdef FB2_FRONT_MATTER
- "description>*{display:none}"
-@@ -78,12 +83,17 @@ static const char *fb2_default_css =
- #else
- "description{display:none}"
- #endif
--"body,section,title,subtitle,p,cite,epigraph,text-author,date,poem,stanza,v,empty-line{display:block}"
-+"body{display:inline !important}"
-+"section,title,subtitle,p,cite,epigraph,text-author,date,poem,stanza,v,empty-line{display:block}"
- "image{display:block}"
- "p>image{display:inline}"
--"table{display:table}"
--"tr{display:table-row}"
--"th,td{display:table-cell}"
-+
-+"table{display:block !important; margin:1em !important;font-size:0.8em;}"
-+"tr,thead,tfoot   {display:block !important;margin-top:0.5em !important;}"
-+"td,th {display:block !important;border-style:solid; border-width:1px; padding:0.1em 0 0.1em 0.5em}"
-+"tbody {display:block !important;}"
-+"th{font-weight:bold; text-align:center}"
-+
- "a{color:#06C;text-decoration:underline}"
- "a[type=note]{font-size:small;vertical-align:super}"
- "code{white-space:pre;font-family:monospace}"
-@@ -93,14 +103,14 @@ static const char *fb2_default_css =
- "sub{font-size:small;vertical-align:sub}"
- "sup{font-size:small;vertical-align:super}"
- "image{margin:1em 0;text-align:center}"
--"cite,poem{margin:1em 2em}"
-+"cite,poem{margin:1em 1.5em}"
- "subtitle,epigraph,stanza{margin:1em 0}"
- "title>p{text-align:center;font-size:x-large}"
- "subtitle{text-align:center;font-size:large}"
--"p{margin-top:1em;text-align:justify}"
-+"p{text-align:justify}"
- "empty-line{padding-top:1em}"
--"p+p{margin-top:0;text-indent:1.5em}"
--"empty-line+p{margin-top:0}"
-+//"p+p{margin-top:0;text-indent:1.5em}"
-+//"empty-line+p{margin-top:0}"
- "section>title{page-break-before:always}"
- ;
- 
-@@ -404,11 +414,11 @@ static fz_image *load_html_image(fz_context *ctx, fz_archive *zip, const char *b
- 	fz_try(ctx)
- 	{
- 		buf = fz_read_archive_entry(ctx, zip, path);
--#if FZ_ENABLE_SVG
-+//#if FZ_ENABLE_SVG
- 		if (strstr(path, ".svg"))
- 			img = fz_new_image_from_svg(ctx, buf);
- 		else
--#endif
-+//#endif
- 			img = fz_new_image_from_buffer(ctx, buf);
- 	}
- 	fz_always(ctx)
-@@ -595,11 +605,12 @@ static void insert_inline_box(fz_context *ctx, fz_html_box *box, fz_html_box *to
- 	}
- }
- 
--static void generate_boxes(fz_context *ctx, fz_xml *node, fz_html_box *top,
-+static fz_html_box *
-+generate_boxes(fz_context *ctx, fz_xml *node, fz_html_box *top,
- 		fz_css_match *up_match, int list_counter, int markup_dir, int markup_lang, struct genstate *g)
- {
- 	fz_css_match match;
--	fz_html_box *box;
-+	fz_html_box *box, *last_top;
- 	const char *tag;
- 	int display;
- 
-@@ -615,7 +626,7 @@ static void generate_boxes(fz_context *ctx, fz_xml *node, fz_html_box *top,
- 
- 			display = fz_get_css_match_display(&match);
- 
--			if (tag[0]=='b' && tag[1]=='r' && tag[2]==0)
-+			if (1==2 && tag[0]=='b' && tag[1]=='r' && tag[2]==0)
- 			{
- 				if (top->type == BOX_INLINE)
- 				{
-@@ -645,8 +656,9 @@ static void generate_boxes(fz_context *ctx, fz_xml *node, fz_html_box *top,
- 				}
- 			}
- 
--			else if (g->is_fb2 && tag[0]=='i' && tag[1]=='m' && tag[2]=='a' && tag[3]=='g' && tag[4]=='e' && tag[5]==0)
-+			else if (tag[0]=='i' && tag[1]=='m' && tag[2]=='a' && tag[3]=='g' && tag[4]=='e' && tag[5]==0)
- 			{
-+				if(g->is_fb2){
- 				const char *src = fz_xml_att(node, "l:href");
- 				if (!src)
- 					src = fz_xml_att(node, "xlink:href");
-@@ -672,8 +684,18 @@ static void generate_boxes(fz_context *ctx, fz_xml *node, fz_html_box *top,
- 						generate_image(ctx, box, fz_keep_image(ctx, img), g);
- 					}
- 				}
--			}
-+				}else{
-+					const char *src = fz_xml_att(node, "xlink:href");
-+					if (src)
-+					{
-+						box = new_box(ctx, g->pool, markup_dir);
-+						fz_apply_css_style(ctx, g->set, &box->style, &match);
-+						insert_inline_box(ctx, box, top, markup_dir, g);
-+						generate_image(ctx, box, load_html_image(ctx, g->zip, g->base_uri, src), g);
-+					}
- 
-+				}
-+			}
- 			else if (display != DIS_NONE)
- 			{
- 				const char *dir, *lang, *id, *href;
-@@ -743,7 +765,9 @@ static void generate_boxes(fz_context *ctx, fz_xml *node, fz_html_box *top,
- 					int child_counter = list_counter;
- 					if (!strcmp(tag, "ul") || !strcmp(tag, "ol"))
- 						child_counter = 0;
--					generate_boxes(ctx, fz_xml_down(node), box, &match, child_counter, child_dir, child_lang, g);
-+					last_top = generate_boxes(ctx, fz_xml_down(node), box, &match, child_counter, child_dir, child_lang, g);
-+					if (last_top != box)
-+						top = last_top;
- 				}
- 			}
- 		}
-@@ -777,22 +801,43 @@ static void generate_boxes(fz_context *ctx, fz_xml *node, fz_html_box *top,
- 
- 		node = fz_xml_next(node);
- 	}
-+
-+	return top;
- }
- 
- static void measure_image(fz_context *ctx, fz_html_flow *node, float max_w, float max_h)
- {
- 	float xs = 1, ys = 1, s = 1;
--	float image_w = node->content.image->w * 72.0f / node->content.image->xres;
--	float image_h = node->content.image->h * 72.0f / node->content.image->yres;
-+
-+	float image_w = node->content.image->w * 72 / 96;
-+	float image_h = node->content.image->h * 72 / 96;
-+
-+	//float image_w = node->content.image->w * 72.0f / node->content.image->xres;
-+	//float image_h = node->content.image->h * 72.0f / node->content.image->yres;
-+
- 	node->x = 0;
- 	node->y = 0;
-+
-+	int size = 50;
-+	if(image_h < size){
-+		image_w = image_w * size/image_h;
-+		image_h = size;
-+	}else {
-+		image_w = image_w * 3;
-+		image_h = image_h * 3;
-+	}
-+
- 	if (image_w > max_w)
- 		xs = max_w / image_w;
- 	if (image_h > max_h)
- 		ys = max_h / image_h;
-+
-+
- 	s = fz_min(xs, ys);
- 	node->w = image_w * s;
- 	node->h = image_h * s;
-+	//node->w = 20;
-+	//node->h = node->box->h;
- }
- 
- typedef struct string_walker
-@@ -1036,8 +1081,8 @@ static float measure_line(fz_html_flow *node, fz_html_flow *end, float *baseline
- 		}
- 		else
- 		{
--			float a = node->box->em * 0.8;
--			float d = node->box->em * 0.2;
-+			float a = node->box->em * 0.8f;
-+			float d = node->box->em * 0.2f;
- 			if (a > max_a) max_a = a;
- 			if (d > max_d) max_d = d;
- 		}
-@@ -1163,11 +1208,11 @@ static void layout_line(fz_context *ctx, float indent, float page_w, float line_
- 			break;
- 		case VA_TOP:
- 		case VA_TEXT_TOP:
--			va = -baseline + node->box->em * 0.8;
-+			va = -baseline + node->box->em * 0.8f;
- 			break;
- 		case VA_BOTTOM:
- 		case VA_TEXT_BOTTOM:
--			va = -baseline + line_h - node->box->em * 0.2;
-+			va = -baseline + line_h - node->box->em * 0.2f;
- 			break;
- 		}
- 
-@@ -1199,10 +1244,12 @@ static void find_accumulated_margins(fz_context *ctx, fz_html_box *box, float *w
- static void flush_line(fz_context *ctx, fz_html_box *box, float page_h, float page_w, float line_w, int align, float indent, fz_html_flow *a, fz_html_flow *b)
- {
- 	float avail, line_h, baseline;
--	avail = page_h - fmodf(box->y + box->h, page_h);
- 	line_h = measure_line(a, b, &baseline);
--	if (line_h > avail)
--		box->h += avail;
-+	if(page_h>0){
-+		avail = page_h - fmodf(box->y + box->h, page_h);
-+		if (line_h > avail)
-+			box->h += avail;
-+		}
- 	layout_line(ctx, indent, page_w, line_w, align, a, b, box, baseline, line_h);
- 	box->h += line_h;
- }
-@@ -1420,10 +1467,12 @@ static float layout_block(fz_context *ctx, fz_html_box *box, fz_html_box *top, f
- 				child->margin[T] = 0;
- 				first = 0;
- 			}
-+
-+
- 			box->h += child->h +
--				child->padding[T] + child->padding[B] +
--				child->border[T] + child->border[B] +
--				child->margin[T] + child->margin[B];
-+							child->padding[T] + child->padding[B] +
-+							child->border[T] + child->border[B] +
-+							child->margin[T] + child->margin[B];
- 		}
- 		else if (child->type == BOX_BREAK)
- 		{
-@@ -1434,12 +1483,13 @@ static float layout_block(fz_context *ctx, fz_html_box *box, fz_html_box *top, f
- 		else if (child->type == BOX_FLOW)
- 		{
- 			layout_flow(ctx, child, box, page_h, hb_buf);
--			if (child->h > 0)
-+			if (1==1 || child->h > 0)
- 			{
- 				box->h += child->h;
- 				vertical = 0;
- 				first = 0;
- 			}
-+
- 		}
- 	}
- 
-@@ -1771,8 +1821,8 @@ static void draw_list_mark(fz_context *ctx, fz_html_box *box, float page_top, fl
- 	else
- 	{
- 		float h = fz_from_css_number_scale(box->style.line_height, box->em, box->em, box->em);
--		float a = box->em * 0.8;
--		float d = box->em * 0.2;
-+		float a = box->em * 0.8f;
-+		float d = box->em * 0.2f;
- 		if (a + d > h)
- 			h = a + d;
- 		y = box->y + a + (h - a - d) / 2;
-@@ -1971,8 +2021,8 @@ static fz_link *load_link_flow(fz_context *ctx, fz_html_flow *flow, fz_link *hea
- 			if (flow->type != FLOW_IMAGE)
- 			{
- 				/* flow->y is the baseline, adjust bbox appropriately */
--				bbox.y0 -= 0.8 * flow->h;
--				bbox.y1 -= 0.8 * flow->h;
-+				bbox.y0 -= 0.8f * flow->h;
-+				bbox.y1 -= 0.8f * flow->h;
- 			}
- 
- 			if (is_internal_uri(href))
-@@ -2299,15 +2349,17 @@ load_fb2_images(fz_context *ctx, fz_xml *root)
- 	{
- 		const char *id = fz_xml_att(binary, "id");
- 		char *b64 = concat_text(ctx, binary);
--		fz_buffer *buf;
--		fz_image *img;
- 
--		buf = fz_new_buffer_from_base64(ctx, b64, strlen(b64));
--		img = fz_new_image_from_buffer(ctx, buf);
--		fz_drop_buffer(ctx, buf);
--		fz_free(ctx, b64);
-+			fz_buffer *buf;
-+			fz_image *img;
-+			if(strlen(b64)>10){
-+				buf = fz_new_buffer_from_base64(ctx, b64, strlen(b64));
-+				img = fz_new_image_from_buffer(ctx, buf);
-+				fz_drop_buffer(ctx, buf);
-+				images = fz_tree_insert(ctx, images, id, img);
-+			}
-+			fz_free(ctx, b64);
- 
--		images = fz_tree_insert(ctx, images, id, img);
- 	}
- 
- 	return images;
-@@ -2581,9 +2633,13 @@ detect_flow_directionality(fz_context *ctx, fz_pool *pool, uni_buf *buffer, fz_b
- 			/* Make sure the buffer is large enough */
- 			if (buffer->len + len > buffer->cap)
- 			{
--				size_t newcap = buffer->cap * 2;
--				if (newcap == 0)
-+				size_t newcap = buffer->cap;
-+				if (newcap < 128)
- 					newcap = 128; /* Sensible small default */
-+
-+				while (newcap < buffer->len + len)
-+					newcap = (newcap * 3) / 2;
-+
- 				buffer->data = fz_resize_array(ctx, buffer->data, newcap, sizeof(uint32_t));
- 				buffer->cap = newcap;
- 			}
-@@ -2636,7 +2692,7 @@ fz_html *
- fz_parse_html(fz_context *ctx, fz_html_font_set *set, fz_archive *zip, const char *base_uri, fz_buffer *buf, const char *user_css)
- {
- 	fz_xml *xml;
--	fz_html *html;
-+	fz_html *html = NULL;
- 
- 	fz_css_match match;
- 	struct genstate g;
-@@ -2696,13 +2752,17 @@ fz_parse_html(fz_context *ctx, fz_html_font_set *set, fz_archive *zip, const cha
- 
- 		generate_boxes(ctx, xml, html->root, &match, 0, DEFAULT_DIR, FZ_LANG_UNSET, &g);
- 
-+		fz_html_box *box;
-+		box = new_box(ctx, g.pool, DEFAULT_DIR);
-+		insert_box(ctx, box, BOX_BREAK, html->root->last);
-+
- 		detect_directionality(ctx, g.pool, html->root);
- 	}
- 	fz_always(ctx)
- 	{
-+		fz_drop_tree(ctx, g.images, (void(*)(fz_context*,void*))fz_drop_image);
- 		fz_drop_css(ctx, g.css);
- 		fz_drop_xml(ctx, xml);
--		fz_drop_tree(ctx, g.images, (void(*)(fz_context*,void*))fz_drop_image);
- 	}
- 	fz_catch(ctx)
- 	{
