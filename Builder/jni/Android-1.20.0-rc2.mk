@@ -7,6 +7,7 @@ MUPDF_ROOT := $(realpath $(LOCAL_PATH)/../../..)
 include $(TOP_LOCAL_PATH)/libmobi-0.11/Android.mk
 include $(TOP_LOCAL_PATH)/libhqx-1.2/Android.mk
 include $(TOP_LOCAL_PATH)/libdjvu-3.5.28/Android.mk
+include $(TOP_LOCAL_PATH)/libantiword/Android.mk
 include $(TOP_LOCAL_PATH)/libwebp-1.2.2/Android.mk
 
 include $(TOP_LOCAL_PATH)/MuPDF-1.20.0.mk
@@ -25,7 +26,7 @@ LOCAL_C_INCLUDES := \
 	$(TOP_LOCAL_PATH)/libmobi-0.9/tools \
 	$(TOP_LOCAL_PATH)/libhqx-1.2 \
 	$(TOP_LOCAL_PATH)
-
+    	
 LOCAL_CFLAGS := -DHAVE_ANDROID
 LOCAL_MODULE := mypdf
 
