@@ -166,6 +166,7 @@ public class SearchFragment2 extends UIFragment<FileMeta> {
 
         @Override
         public void afterTextChanged(final Editable s) {
+            AppState.get().searchQuery = s.toString();
         }
 
         @Override
@@ -455,6 +456,11 @@ public class SearchFragment2 extends UIFragment<FileMeta> {
 
         authorsAdapter.setOnItemClickListener(onAuthorSeriesClick);
 
+        if (AppState.get().isRestoreSearchQuery && !TxtUtils.isEmpty(AppState.get().searchQuery))
+        {
+            searchEditText.setText(AppState.get().searchQuery);
+        }
+
         onGridList();
 
         if (AppDB.get().getCount() == 0) {
@@ -575,8 +581,8 @@ public class SearchFragment2 extends UIFragment<FileMeta> {
     }
 
     private void onMetaInfoClick(SEARCH_IN mode, String result) {
-        if (mode == SEARCH_IN.SERIES) {
-            result = "," + result + ",";
+        if (mode == SEARCH_IN.SERIES && !result.startsWith(EMPTY_ID)) {
+            result = StringDB.EXACTMATCHCHAR + result + StringDB.EXACTMATCHCHAR;
         }
 
         searchEditText.setText(mode.getDotPrefix() + " " + result);
@@ -764,9 +770,9 @@ public class SearchFragment2 extends UIFragment<FileMeta> {
         String txt = searchEditText.getText().toString().trim();
         searchEditText.setHint(R.string.search);
 
-        if(AppsConfig.IS_LOG){
-            searchEditText.setHint(Apps.getApplicationName(getContext()));
-        }
+        //if(AppsConfig.IS_LOG){
+            //searchEditText.setHint(Apps.getApplicationName(getContext()));
+        //}
 
 
         if (CMD_KEYCODE.equals(txt)) {
@@ -1049,9 +1055,9 @@ public class SearchFragment2 extends UIFragment<FileMeta> {
             onRefresh.setActivated(!BooksService.isRunning);
             searchEditText.setHint(R.string.search);
 
-            if(AppsConfig.IS_LOG){
-                searchEditText.setHint(Apps.getApplicationName(getContext()));
-            }
+//            if(AppsConfig.IS_LOG){
+//                searchEditText.setHint(Apps.getApplicationName(getContext()));
+//            }
 
         }
     }

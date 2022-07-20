@@ -544,6 +544,7 @@ public class AppDB {
             } else {
                 if (TxtUtils.isNotEmpty(str)) {
                     str = str.replace(" ", "%").replace("*", "%");
+                    str = str.replace(StringDB.EXACTMATCHCHAR, StringDB.DIVIDER);
 
                     String string = "%" + str + "%";
 

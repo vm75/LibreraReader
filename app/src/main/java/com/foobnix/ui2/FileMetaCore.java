@@ -130,6 +130,8 @@ public class FileMetaCore {
                 info = DjvuExtract.getBookOverview(path);
             } else if (BookType.PDF.is(path)) {
                 info = PdfExtract.getBookOverview(path);
+            } else if (BookType.CBR.is(path) || BookType.CBZ.is(path)) {
+                info = CbzCbrExtractor.getBookOverview(path);
             }
             if (TxtUtils.isEmpty(info)) {
                 return "";
@@ -161,11 +163,12 @@ public class FileMetaCore {
 
     public static void reUpdateIfNeed(FileMeta fileMeta) {
         if (fileMeta.getState() != null && fileMeta.getState() != FileMetaCore.STATE_FULL) {
-            LOG.d("reupdateIfNeed", fileMeta.getPath(), fileMeta.getState());
+            LOG.d("reupdateIfNeed 1", fileMeta.getPath(), fileMeta.getState());
             EbookMeta ebookMeta = FileMetaCore.get().getEbookMeta(fileMeta.getPath(), CacheDir.ZipApp, true);
             FileMetaCore.get().upadteBasicMeta(fileMeta, new File(fileMeta.getPath()));
             FileMetaCore.get().udpateFullMeta(fileMeta, ebookMeta);
             AppDB.get().updateOrSave(fileMeta);
+            LOG.d("reupdateIfNeed 2", fileMeta.getPath(), fileMeta.getState());
         }
     }
 
@@ -261,8 +264,7 @@ public class FileMetaCore {
             ebookMeta.setPublisher(local.getPublisher());
 
         } else if (BookType.CBR.is(unZipPath) || BookType.CBZ.is(unZipPath)) {
-            ebookMeta.setPagesCount(CbzCbrExtractor.getPageCount(unZipPath));
-
+            ebookMeta = CbzCbrExtractor.getBookMetaInformation(unZipPath);
         } else if (BookType.FOLDER.is(unZipPath)) {
             File parent = new File(unZipPath).getParentFile();
             ebookMeta.setTitle(parent.getName());
