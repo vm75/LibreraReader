@@ -328,7 +328,16 @@ static void generate_text(fz_context *ctx, fz_html_box *box, const char *text, i
 
 	while (*text)
 	{
-		if (iswhite(*text))
+		if (bnl && (*text == '\n' || *text == '\r'))
+		{
+			if (text[0] == '\r' && text[1] == '\n')
+				text += 2;
+			else
+				text += 1;
+			add_flow_break(ctx, pool, flow, box);
+			g->at_bol = 1;
+		}
+		else if (iswhite(*text))
 		{
 			if (collapse)
 			{
@@ -513,6 +522,7 @@ static void init_box(fz_context *ctx, fz_html_box *box, fz_bidi_direction markup
 	box->flow_tail = &box->flow_head;
 	box->markup_dir = markup_dir;
 	box->style = NULL;
+	//fz_default_css_style(ctx, &box->style);
 }
 
 static void fz_drop_html_box(fz_context *ctx, fz_html_box *box)
