@@ -88,6 +88,65 @@ needed to verify Android UI and end-to-end reader behaviour. At the integration
 baseline, five existing tests fail in `TestPage` (whitespace expectation) and
 `TestSync` (Android storage setup); distinguish these from new regressions.
 
+## GitHub releases for the F-Droid flavour
+
+`.github/workflows/publish-fdroid-release.yml` builds the F-Droid release
+flavour and creates a GitHub Release containing the universal APK, the
+`arm64-v8a` APK, and checksums. This publishes assets on GitHub; it does not
+submit the app to the F-Droid repository. The workflow accepts stable `X.Y.Z`
+tags only, requires the tagged commit to be on `main`, and requires the tag to
+match `appVersionNumberBase.appVersionNumberIndex` in `app/gradle.properties`.
+It runs `updateFDroid` before building so the F-Droid version matches.
+
+### Configure signing secrets
+
+The release build uses the same persistent PKCS#12 signing key for every
+GitHub release. Create and safely back up a keystore as described in
+[README.md](README.md#create-a-keystore) (use a stable alias such as
+`librera-release`), then add these repository secrets under **Settings →
+Secrets and variables → Actions**:
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | Base64 encoding of the PKCS#12 keystore file, without line breaks. |
+| `RELEASE_STORE_PASSWORD` | Keystore password. |
+| `RELEASE_KEY_ALIAS` | Alias for the signing key in that keystore. |
+| `RELEASE_KEY_PASSWORD` | Password for that key. For PKCS#12, use the keystore password. |
+
+For example, encode the keystore on Linux or macOS with:
+
+```sh
+base64 < librera-release.p12 | tr -d '\n'
+```
+
+Paste that output only into the `ANDROID_KEYSTORE_BASE64` secret field. Keep
+the keystore and passwords backed up securely. A different key cannot update
+an APK installed from an earlier GitHub release. F-Droid signs its own builds
+separately, so these GitHub APKs cannot update an installation signed by the
+F-Droid client.
+
+### Tag a release
+
+Set `appVersionNumberBase` and `appVersionNumberIndex` to the intended release
+version in `app/gradle.properties`, commit that change on `main`, and push the
+commit before pushing its tag. For example, if the committed values produce
+`10.0.8`:
+
+```sh
+git switch main
+git pull --ff-only origin main
+git add app/gradle.properties
+git commit -m "Prepare release 10.0.8"
+git push origin main
+git tag -a 10.0.8 -m "Librera 10.0.8"
+git push origin 10.0.8
+```
+
+Use the exact `X.Y.Z` version from `app/gradle.properties`; `v` prefixes and
+prerelease suffixes are rejected. The tag must point to a commit already
+reachable from `origin/main`. The workflow then builds and publishes the APKs
+as that tag's GitHub Release.
+
 ## Keep fork commits above upstream
 
 Use these remotes and tracking settings in each clone:

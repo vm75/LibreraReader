@@ -1,0 +1,177 @@
+name: Publish F-Droid release
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-tag:
+    name: Validate release tag
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require a version tag on main
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a stable X.Y.Z tag, got: $tag" >&2
+            exit 1
+          fi
+
+          git fetch origin +refs/heads/main:refs/remotes/origin/main --no-tags
+          tag_commit="$(git rev-parse "${GITHUB_REF}^{commit}")"
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
+            echo "Tag $tag does not point to a commit on main" >&2
+            exit 1
+          fi
+
+          base="$(sed -n 's/^appVersionNumberBase=//p' app/gradle.properties | tail -n 1)"
+          index="$(sed -n 's/^appVersionNumberIndex=//p' app/gradle.properties | tail -n 1)"
+          version="${base}.${index}"
+          if [[ "$tag" != "$version" ]]; then
+            echo "Tag $tag does not match app version $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build F-Droid APKs
+    needs: validate-tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android build packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager "platforms;android-37" "ndk;27.2.12479018" "cmake;3.22.1"
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/.android/sdk}}"
+          echo "LIBRERA_NDK_DIR=$sdk_root/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "LIBRERA_MUPDF_DIR=$RUNNER_TEMP/mupdf" >> "$GITHUB_ENV"
+
+      - name: Fetch MuPDF fork
+        run: git clone --depth 1 --branch main https://github.com/vm75/mupdf.git "$RUNNER_TEMP/mupdf"
+
+      - name: Prepare release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" ]]; then
+            echo "Missing repository secret ANDROID_KEYSTORE_BASE64" >&2
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release-keystore.p12"
+          test -s "$RUNNER_TEMP/release-keystore.p12"
+
+      - name: Build release APKs
+        env:
+          RELEASE_VERSION: ${{ needs.validate-tag.outputs.version }}
+          ORG_GRADLE_PROJECT_RELEASE_STORE_FILE: ${{ runner.temp }}/release-keystore.p12
+          ORG_GRADLE_PROJECT_RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          ORG_GRADLE_PROJECT_pro_appGdriveKey: ""
+          ORG_GRADLE_PROJECT_librera_appGdriveKey: ""
+          ORG_GRADLE_PROJECT_librera_admobAppId: ""
+          ORG_GRADLE_PROJECT_librera_admobBannerId: ""
+          ORG_GRADLE_PROJECT_librera_admobFullId: ""
+          ORG_GRADLE_PROJECT_librera_admobRewardId: ""
+          ORG_GRADLE_PROJECT_pdf_classic_appGdriveKey: ""
+          ORG_GRADLE_PROJECT_pdf_classic_admobAppId: ""
+          ORG_GRADLE_PROJECT_pdf_classic_admobBannerId: ""
+          ORG_GRADLE_PROJECT_pdf_classic_admobFullId: ""
+          ORG_GRADLE_PROJECT_pdf_classic_admobRewardId: ""
+          ORG_GRADLE_PROJECT_ebooka_appGdriveKey: ""
+          ORG_GRADLE_PROJECT_ebooka_admobAppId: ""
+          ORG_GRADLE_PROJECT_ebooka_admobBannerId: ""
+          ORG_GRADLE_PROJECT_ebooka_admobFullId: ""
+          ORG_GRADLE_PROJECT_ebooka_admobRewardId: ""
+          ORG_GRADLE_PROJECT_pdf_v2_appGdriveKey: ""
+          ORG_GRADLE_PROJECT_pdf_v2_admobAppId: ""
+          ORG_GRADLE_PROJECT_pdf_v2_admobBannerId: ""
+          ORG_GRADLE_PROJECT_pdf_v2_admobFullId: ""
+          ORG_GRADLE_PROJECT_pdf_v2_admobRewardId: ""
+          ORG_GRADLE_PROJECT_tts_reader_appGdriveKey: ""
+          ORG_GRADLE_PROJECT_tts_reader_admobAppId: ""
+          ORG_GRADLE_PROJECT_tts_reader_admobBannerId: ""
+          ORG_GRADLE_PROJECT_tts_reader_admobFullId: ""
+          ORG_GRADLE_PROJECT_tts_reader_admobRewardId: ""
+          ORG_GRADLE_PROJECT_epub_reader_appGdriveKey: ""
+          ORG_GRADLE_PROJECT_epub_reader_admobAppId: ""
+          ORG_GRADLE_PROJECT_epub_reader_admobBannerId: ""
+          ORG_GRADLE_PROJECT_epub_reader_admobFullId: ""
+          ORG_GRADLE_PROJECT_epub_reader_admobRewardId: ""
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ORG_GRADLE_PROJECT_RELEASE_STORE_PASSWORD"
+          test -n "$ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS"
+          test -n "$ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD"
+          ./gradlew --no-daemon updateFDroid
+          ./gradlew --no-daemon :app:assembleFdroidRelease
+
+          apk_dir=app/build/outputs/apk/fdroid/release
+          mkdir -p dist
+          cp "$apk_dir/Librera Fdroid-${RELEASE_VERSION}-mupdf-uni.apk" \
+            "dist/Librera-FDroid-${RELEASE_VERSION}-universal.apk"
+          cp "$apk_dir/Librera Fdroid-${RELEASE_VERSION}-mupdf-arm64.apk" \
+            "dist/Librera-FDroid-${RELEASE_VERSION}-arm64-v8a.apk"
+          sha256sum dist/*.apk > dist/SHA256SUMS
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fdroid-release-apks
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Publish GitHub release
+    needs: [validate-tag, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: fdroid-release-apks
+          path: dist
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" dist/*
+          --verify-tag
+          --title "Librera F-Droid $GITHUB_REF_NAME"
+          --generate-notes
