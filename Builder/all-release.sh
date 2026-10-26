@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
-# The whole release, built on one MuPDF: ./all-release.sh 1.28.5
-# (or through all-release-1.23.7.sh / all-release-1.28.5.sh). The MuPDF version goes into the
-# names of the APKs, bundles, mappings and native symbols, so both releases sit side by side.
-MUPDF=$1
-if [ -z "$MUPDF" ] || [ ! -f "./link_to_mupdf_$MUPDF.sh" ]; then
-  echo "Usage: $0 <mupdf version>, one of:" $(ls link_to_mupdf_*.sh | sed 's/link_to_mupdf_//; s/\.sh//')
+# Build against the configured vm75/mupdf checkout. Select revisions in that
+# checkout; Builder/build/mupdf-fork/build.json records its revision and codecs.
+MUPDF=${1:-fork}
+if [ ! -f "./link_to_mupdf_$MUPDF.sh" ]; then
+  echo "Unknown MuPDF build: $MUPDF" >&2
   exit 1
 fi
 
@@ -25,6 +24,7 @@ fi
 ####################################
 
 ./link_to_mupdf_$MUPDF.sh || exit 1
+./build-nomupdf.sh "$MUPDF" || exit 1
 
 cd ../
 
@@ -91,9 +91,13 @@ else
   OBJCOPY="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objcopy"
 fi
 SYMBOLS=$(mktemp -d)
+NATIVE_OBJ="Builder/mupdf-$MUPDF/platform/librera/obj/local"
+if [ "$MUPDF" = fork ]; then
+  NATIVE_OBJ="Builder/build/mupdf-fork/obj/local"
+fi
 for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
   mkdir -p "$SYMBOLS/$ABI"
-  "$OBJCOPY" --only-keep-debug Builder/mupdf-$MUPDF/platform/librera/obj/local/$ABI/libMuPDF.so "$SYMBOLS/$ABI/libMuPDF.so.dbg" || exit 1
+  "$OBJCOPY" --only-keep-debug "$NATIVE_OBJ/$ABI/libMuPDF.so" "$SYMBOLS/$ABI/libMuPDF.so.dbg" || exit 1
 done
 SYMBOLS_ZIP="Librera-$VERSION-mupdf$MUPDF-native-debug-symbols.zip"
 for D in "${RELEASE_DIRS[@]}"; do

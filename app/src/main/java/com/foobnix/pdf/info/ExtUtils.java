@@ -107,8 +107,12 @@ public class ExtUtils {
     public static final String REFLOW_HTML = "-reflow.html";
     public final static List<String> otherExts = Arrays.asList(AppState.OTHER_BOOK_EXT);
     public final static List<String> lirbeExt = Arrays.asList(AppState.LIBRE_EXT);
-    public final static List<String> imageExts = Arrays.asList(".png", ".jpg", ".jpeg", ".gif", ".webp");
-    public final static List<String> imageMimes = Arrays.asList("image/png", "image/jpg", "image/jpeg", "image/gif");
+    public final static List<String> imageExts = Engines.IS_MUPDF
+            ? Arrays.asList(".png", ".jpg", ".jpeg", ".gif", ".webp", ".jxl")
+            : Arrays.asList(".png", ".jpg", ".jpeg", ".gif", ".webp");
+    public final static List<String> imageMimes = Engines.IS_MUPDF
+            ? Arrays.asList("image/png", "image/jpg", "image/jpeg", "image/gif", "image/webp", "image/jxl")
+            : Arrays.asList("image/png", "image/jpg", "image/jpeg", "image/gif", "image/webp");
     public final static List<String> archiveExts = Arrays.asList(AppState.OTHER_ARCH_EXT);
     public final static List<String> browseExts = BookType.getAllSupportedExtensions();
     public final static List<String> AUDIO = Arrays.asList(".mp3", ".mp4", ".wav", ".ogg", ".m4a", ".m4b", ".flac");

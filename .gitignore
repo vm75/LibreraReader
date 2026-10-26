@@ -9,6 +9,7 @@
 /.idea*
 /Builder/mupdf-*
 /Builder/build
+/app/src/main/jniLibs/
 /docs/.jekyll-cache/
 /Builder/bin/
 /smartreflow/bin/

@@ -695,7 +695,12 @@ public class ImageExtractor {
             // uri = uri.replace("data:image/gif;base64,", "");
             uri = uri.substring(uri.indexOf(",") + 1);
             LOG.d("Load image data ", uri);
-            return new ByteArrayInputStream(Base64.decode(uri, Base64.DEFAULT));
+            byte[] data = Base64.decode(uri, Base64.DEFAULT);
+            if (org.ebookdroid.droids.mupdf.codec.MuPdfImage.isJxl(data)) {
+                byte[] png = org.ebookdroid.droids.mupdf.codec.MuPdfImage.decodeToPng(data, IMG.getImageSize());
+                return png == null ? null : new ByteArrayInputStream(png);
+            }
+            return new ByteArrayInputStream(data);
         }
         if (imageUri.startsWith("assets:")) {
             return LibreraApp.context.getResources().getAssets().open(imageUri.replace("assets://", ""));
@@ -719,6 +724,13 @@ public class ImageExtractor {
 
             if (ExtUtils.isExteralSD(path)) {
                 if (ExtUtils.isImagePath(path)) {
+                    if (path.toLowerCase(Locale.US).endsWith(".jxl")) {
+                        try (InputStream input = c.getContentResolver().openInputStream(Uri.parse(path))) {
+                            byte[] png = org.ebookdroid.droids.mupdf.codec.MuPdfImage.decodeToPng(
+                                    BaseExtractor.getEntryAsByte(input), IMG.getImageSize());
+                            return png == null ? null : new ByteArrayInputStream(png);
+                        }
+                    }
                     return c.getContentResolver().openInputStream(Uri.parse(path));
                 }
                 String display = ExtUtils.getFileName(Uri.decode(path));

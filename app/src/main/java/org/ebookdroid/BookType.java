@@ -47,6 +47,9 @@ public enum BookType {
     PDF(PdfContext.class, false, false, Engines.IS_MUPDF ? list("pdf", "xps") : list("pdf"), list("application/pdf","application/oxps","application/vnd.ms-xpsdocument")),
     TIFF(PdfContext.class, false, false, Engines.IS_MUPDF ? list("tiff", "tif") : list("xxx"), list("image/tiff")),
 
+    IMAGE(PdfContext.class, false, false, Engines.IS_MUPDF ? list("webp", "jxl") : list("xxx"),
+            list("image/webp", "image/jxl")),
+
     CBZ(PdfContext.class, false, true, list("cbz"), list("application/x-cbz","application/comicbook+zip")),
     CBR(CbrContext.class, false, true, list("cbr"), list("application/x-cbr","application/comicbook+rar")),
 

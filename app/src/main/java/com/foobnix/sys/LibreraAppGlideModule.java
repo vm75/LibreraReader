@@ -204,6 +204,10 @@ public class LibreraAppGlideModule extends AppGlideModule {
 
     @Override
     public void registerComponents(Context context, Glide glide, Registry registry) {
+        if (com.foobnix.pdf.info.Engines.IS_MUPDF) {
+            registry.prepend(java.nio.ByteBuffer.class, Bitmap.class, new JxlBitmapDecoder(glide.getBitmapPool()));
+            registry.prepend(InputStream.class, Bitmap.class, new JxlBitmapDecoder.StreamDecoder(glide.getBitmapPool()));
+        }
         //registry.append(Bitmap.class, new BitmapEncoder(glide.getArrayPool()));
         //registry.prepend(Bitmap.class, new BitmapEncoder(glide.getArrayPool()));
         // Pictures off the network are fetched with the catalogues' own client, in place of

@@ -245,6 +245,22 @@
         </activity>
 
 
+        <activity-alias
+            android:name="com.foobnix.ImageOpener"
+            android:targetActivity="com.foobnix.OpenerActivity"
+            android:enabled="${mupdfImagesEnabled}"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="image/webp" />
+                <data android:mimeType="image/jxl" />
+            </intent-filter>
+        </activity-alias>
+
         <activity
             android:name="com.foobnix.pdf.search.activity.HorizontalViewActivity"
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden"

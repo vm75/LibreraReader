@@ -66,6 +66,7 @@ public class HtmlToEpub {
         MIME.put("gif", "image/gif");
         MIME.put("bmp", "image/bmp");
         MIME.put("webp", "image/webp");
+        MIME.put("jxl", "image/jxl");
         MIME.put("svg", "image/svg+xml");
         MIME.put("tif", "image/tiff");
         MIME.put("tiff", "image/tiff");

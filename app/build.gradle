@@ -4,6 +4,39 @@ plugins {
 }
 
 def taskName = getGradle().getStartParameter().getTaskRequests().toString()
+// Explicit legacy builds still use the libraries prepared by their link script.
+def buildFromMuPdfFork = !project.hasProperty("mupdf") || project.property("mupdf") == "fork"
+
+def buildMuPdfFork = tasks.register("buildMuPdfFork", Exec) {
+    description = "Build Librera JNI libraries from the configured vm75/mupdf checkout"
+    group = "build"
+    workingDir rootProject.projectDir
+    commandLine "bash", rootProject.file("Builder/link_to_mupdf_fork.sh").absolutePath
+    if (taskName.contains("Fdroid")) {
+        args "fdroid"
+    }
+    // ndk-build and CMake track changes in the sibling checkout themselves.
+    // Do not consider an old .so current just because it is already packaged.
+    outputs.dir(layout.projectDirectory.dir("src/main/jniLibs"))
+    outputs.upToDateWhen { false }
+}
+
+tasks.configureEach { task ->
+    // F-Droid variants have no Firebase dependencies or google-services.json.
+    if (task.name.startsWith("processFdroid") && task.name.endsWith("GoogleServices")) {
+        task.enabled = false
+    }
+    if (buildFromMuPdfFork && task.name.startsWith("merge")
+            && (task.name.endsWith("NativeLibs") || task.name.endsWith("JniLibFolders"))) {
+        if (task.name.contains("JS")) {
+            // JS packaging shares liblame with native variants. Order combined builds
+            // without requiring MuPDF when only a JS variant was requested.
+            task.mustRunAfter(buildMuPdfFork)
+        } else {
+            task.dependsOn(buildMuPdfFork)
+        }
+    }
+}
 
 
 ext {
@@ -53,6 +86,7 @@ android {
         versionCode = codeNumber
         versionName = versionNumber
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders.mupdfImagesEnabled = "true"
     }
 
     configurations {
@@ -153,6 +187,7 @@ android {
             dimension = "version"
             applicationId = "com.foobnix.pro.pdf.reader"
             manifestPlaceholders = [
+                    mupdfImagesEnabled: "false",
                     appName      : "Librera FD-JS",
                     appIcon      : "@mipmap/icon_pdf_pro",
                     appRoundIcon : "@mipmap/icon_pdf_pro",
@@ -170,6 +205,7 @@ android {
             dimension = "version"
             applicationId = "com.foobnix.pro.pdf.reader"
             manifestPlaceholders = [
+                    mupdfImagesEnabled: "false",
                     appName      : "Librera PRO-JS",
                     appIcon      : "@mipmap/icon_pdf_pro",
                     appRoundIcon : "@mipmap/icon_pdf_pro",

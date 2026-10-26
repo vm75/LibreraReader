@@ -19,7 +19,40 @@ set -e
 BUILD_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$BUILD_DIR"
 
-VERSION_TAG="${1:-1.28.5}"
+VERSION_TAG="${1:-fork}"
+if [ "$VERSION_TAG" = fork ]; then
+    GRADLE_PROPERTIES="${GRADLE_USER_HOME:-$HOME/.gradle}/gradle.properties"
+    property() {
+        if [ -f "$GRADLE_PROPERTIES" ]; then
+            sed -n "s/^$1=//p" "$GRADLE_PROPERTIES" | tail -n 1
+        fi
+    }
+    MUPDF_ROOT="${LIBRERA_MUPDF_DIR:-$(property librera_mupdf_dir)}"
+    MUPDF_ROOT="${MUPDF_ROOT:-$(dirname "$(dirname "$BUILD_DIR")")/mupdf}"
+    NDK_DIR="${LIBRERA_NDK_DIR:-${ANDROID_NDK_HOME:-$(property librera_ndk_dir)}}"
+    if [ ! -x "$NDK_DIR/ndk-build" ]; then
+        echo "Set LIBRERA_NDK_DIR, ANDROID_NDK_HOME, or librera_ndk_dir" >&2
+        exit 1
+    fi
+    OUTPUT="$BUILD_DIR/build/nomupdf-fork"
+    "$NDK_DIR/ndk-build" -j"${LIBRERA_NATIVE_JOBS:-4}" \
+        NDK_PROJECT_PATH="$(dirname "$BUILD_DIR")" \
+        APP_BUILD_SCRIPT="$BUILD_DIR/jni/Android-nomupdf.mk" \
+        NDK_APPLICATION_MK="$BUILD_DIR/jni/Application.mk" \
+        LIBRERA_MUPDF_ROOT="$MUPDF_ROOT" APP_PLATFORM=android-24 \
+        "APP_ABI=${LIBRERA_ABIS:-armeabi-v7a arm64-v8a x86 x86_64}" \
+        NDK_OUT="$OUTPUT/obj" NDK_LIBS_OUT="$OUTPUT/libs"
+    LIBS="$BUILD_DIR/../app/src/noMupdf/jniLibs"
+    mkdir -p "$LIBS"
+    for ABI in ${LIBRERA_ABIS:-armeabi-v7a arm64-v8a x86 x86_64}; do
+        if [ -d "$LIBS/$ABI" ] && [ ! -L "$LIBS/$ABI" ]; then
+            cp "$OUTPUT/libs/$ABI/libLibreraDocs.so" "$LIBS/$ABI/"
+        else
+            ln -sfn "../../../../Builder/build/nomupdf-fork/libs/$ABI" "$LIBS/$ABI"
+        fi
+    done
+    exit 0
+fi
 MUPDF_JAVA="$BUILD_DIR/mupdf-$VERSION_TAG/platform/librera"
 LIBS="$BUILD_DIR/../app/src/noMupdf/jniLibs"
 

@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../ebookdroid.h"
-#include "../javahelpers.h"
+#include "ebookdroid.h"
+#include "javahelpers.h"
 #include "mupdf/fitz.h"
 #include "mupdf/pdf.h"
 #include "androidfonts.h"
@@ -299,8 +299,20 @@ JNIEXPORT jlong
         mupdf_throw_exception(env, "Out of Memory");
         goto cleanup;
     }
+#ifdef LIBRERA_MUPDF_FORK
+    fz_set_reflow_options(doc->ctx,
+        FZ_REFLOW_RELATIVE_FONT_SIZES | FZ_REFLOW_COMPACT_SPACING |
+        FZ_REFLOW_THICK_DECORATIONS | FZ_REFLOW_NO_DEFAULT_CSS |
+        FZ_REFLOW_EXTENDED_IMAGE_REFERENCES | FZ_REFLOW_IGNORE_INVALID_NAVIGATION |
+        FZ_REFLOW_SOLID_BORDERS | FZ_REFLOW_HIDE_MISSING_IMAGES);
+    /* Validate persisted values before enabling the generic image-size override. */
+    if (!isfinite(imageScale) || imageScale <= 0)
+        imageScale = 1;
+    fz_set_reflow_image_scale(doc->ctx, is_image_scale, imageScale);
+#else
     doc->ctx->image_scale = imageScale;
     doc->ctx->is_image_scale = is_image_scale;
+#endif
 
     fz_register_document_handlers(doc->ctx);
 

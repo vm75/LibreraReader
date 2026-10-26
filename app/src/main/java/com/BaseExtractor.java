@@ -23,7 +23,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.FileInputStream;
 import java.util.Map;
+
+import org.ebookdroid.droids.mupdf.codec.MuPdfImage;
 
 public abstract class BaseExtractor {
 
@@ -124,15 +127,24 @@ public abstract class BaseExtractor {
             if(array==null){
                 return null;
             }
+            if (MuPdfImage.isJxl(array)) {
+                byte[] png = MuPdfImage.decodeToPng(array, width);
+                return png == null ? null : BitmapFactory.decodeByteArray(png, 0, png.length);
+            }
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inJustDecodeBounds = true;
             BitmapFactory.decodeByteArray(array, 0, array.length, options);
             int imageWidth = options.outWidth;
-            options.inSampleSize = imageWidth / width;
+            options.inSampleSize = Math.max(1, imageWidth / Math.max(1, width));
             // options.inSampleSize = 1;
             options.inJustDecodeBounds = false;
             LOG.d("inSampleSize", options.inSampleSize);
-            return BitmapFactory.decodeByteArray(array, 0, array.length, options);
+            Bitmap bitmap = BitmapFactory.decodeByteArray(array, 0, array.length, options);
+            if (bitmap == null && MuPdfImage.isWebp(array)) {
+                byte[] png = MuPdfImage.decodeToPng(array, width);
+                return png == null ? null : BitmapFactory.decodeByteArray(png, 0, png.length);
+            }
+            return bitmap;
 
         } catch (Exception e) {
             LOG.e(e);
@@ -142,11 +154,17 @@ public abstract class BaseExtractor {
 
     public static InputStream decodeImage(String path, int width) {
         try {
+            if (path.toLowerCase(java.util.Locale.US).endsWith(".jxl")) {
+                try (InputStream input = new FileInputStream(path)) {
+                    byte[] png = MuPdfImage.decodeToPng(getEntryAsByte(input), width);
+                    return png == null ? null : new ByteArrayInputStream(png);
+                }
+            }
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(path, options);
             int imageWidth = options.outWidth;
-            options.inSampleSize = imageWidth / width;
+            options.inSampleSize = Math.max(1, imageWidth / Math.max(1, width));
             // options.inSampleSize = 1;
             options.inJustDecodeBounds = false;
             LOG.d("inSampleSize", options.inSampleSize);

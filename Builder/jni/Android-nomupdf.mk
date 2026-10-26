@@ -22,7 +22,7 @@ TOP_LOCAL_PATH := $(LOCAL_PATH)
 # build the symbols come from mupdf_thirdparty_libjpeg. There is no MuPDF here to take them from,
 # so the same sources are built into a static library of this build's own below. libjpeg carries
 # its own permissive licence and is no part of MuPDF itself; nothing of MuPDF's is compiled here.
-MUPDF_ROOT := $(realpath $(LOCAL_PATH)/../../..)
+MUPDF_ROOT := $(if $(LIBRERA_MUPDF_ROOT),$(LIBRERA_MUPDF_ROOT),$(realpath $(LOCAL_PATH)/../../..))
 MUPDF_PATH := $(MUPDF_ROOT)
 
 include $(MUPDF_PATH)/Makelists
