@@ -1,3 +1,5 @@
+> **vm75 fork:** [Extensions, builds, and upstream rebase workflow](FORK-README.md).
+
 ![Logo](https://raw.githubusercontent.com/foobnix/LirbiReader/master/logo.jpg)
 
 **The development and support of Librera is frozen for an unpredictable time, there is a big war in my country
@@ -43,8 +45,8 @@ and OPDS Catalogs
 mesa-common-dev libxcursor-dev libxrandr-dev libxinerama-dev libglu1-mesa-dev libxi-dev pkg-config libgl-dev
 ~~~~
 
-You also need the Android NDK in version 20+
-Please ensure to download it using android studio and add the NDK to your PATH.
+Native builds use the Android NDK (validated with r27d), Python 3, CMake, Ninja,
+Make, and a C/C++ toolchain. Set `LIBRERA_NDK_DIR` to the NDK directory.
 
 ## Create a keystore
 
@@ -81,25 +83,18 @@ For this project only Analytics is used, so a spakling plan is all you need.
 
 ## Librera Build on MuPdf
 
-~~~~
-cd Builder
-./link_to_mupdf_x.x.x.sh (Change the paths to mupdf and jniLibs folders)
-cd ..
-./gradlew assembleLibrera
-~~~~
+This fork's native build uses vm75/mupdf. See the
+[fork build guide](FORK-README.md#build-and-validate) for setup, codec support,
+and native / MuPDF-free validation commands.
 
 ## Building for F-Droid for Android
 
-If you wish to build for F-Droid (e.g. not using google services, Internet) you can run the build with
+```sh
+./gradlew :app:assembleFdroidDebug
+```
 
-~~~~
-cd Builder
-./link_to_mupdf_x.x.x.sh
-cd ..
-./gradlew assembleFdroid
-~~~~
-
-F-Droid build does also not need a **google-services.json**
+F-Droid builds do not need a **google-services.json**. Configure the native
+build prerequisites in the [fork guide](FORK-README.md#build-and-validate).
 
 ## What's new
 
@@ -148,13 +143,14 @@ Full release notes: https://github.com/foobnix/LibreraReader/releases
 
 | Library    | Version          | License              |
 |------------|------------------|----------------------|
-| MuPDF      | 1.28.5 (1.23.7)  | AGPL-3.0             |
+| MuPDF      | 1.29.0 (vm75 fork)  | AGPL-3.0             |
 | DjVuLibre  | 3.5.28           | GPL-2.0-or-later     |
 | antiword   | 1.3.1            | GPL-2.0              |
 | libmobi    | 0.12             | LGPL-3.0-or-later    |
 | hqx        | 1.2              | LGPL-2.1-or-later    |
 | LAME       | 3.100            | LGPL-2.0-or-later    |
-| libwebp    | 1.3.2            | BSD-3-Clause         |
+| libwebp    | 1.6.0            | BSD-3-Clause         |
+| libjxl     | 0.12.0           | BSD-3-Clause         |
 
 | Component                                 | License                       |
 |-------------------------------------------|-------------------------------|
